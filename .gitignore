@@ -2,6 +2,7 @@
 .venv/
 .env
 blueprint.md
+status.md
 __pycache__/
 *.pyc
 *.egg-info/

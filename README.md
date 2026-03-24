@@ -37,6 +37,7 @@ Agethos borrows the answer from **cognitive science, personality psychology, and
 | **Persona evolution** | L2 dynamic + emotion drift | L2 daily update | Static | Static |
 | **Character card formats** | W++, SBF, Tavern Card V2 | None | None | Native |
 | **Autopilot mode** | OCEAN-driven triggers + dialogue continuity | None | Task-based | None |
+| **Social cognition** | Context reading + personality-driven strategy | None | None | None |
 | **LLM-agnostic** | OpenAI, Anthropic, custom (`base_url`) | OpenAI only | Various | N/A |
 
 ---
@@ -436,6 +437,40 @@ task = asyncio.create_task(pilot.run())  # polls every 1s
 pilot.stop()
 ```
 
+### Social Cognition — Reading the Room
+
+Agents read conversation context (atmosphere, tension, unresolved issues) and choose a social strategy based on personality:
+
+```python
+from agethos.cognition.social import SocialCognition
+from agethos.models import OceanTraits
+from agethos.llm.openai import OpenAIAdapter
+
+social = SocialCognition(
+    llm=OpenAIAdapter(),
+    name="Minsoo",
+    ocean=OceanTraits(O=0.6, C=0.8, E=0.8, A=0.4, N=0.2),
+    role="Team Lead",
+)
+
+# Read the room
+context = await social.read_context(conversation_text)
+# → atmosphere: "urgent", tension: 70%, undercurrent: "frustration over delays"
+
+# Decide how to respond based on personality
+strategy = await social.decide_strategy(conversation_text, context)
+# → strategy: "take_charge", tone: "decisive", initiative: 90%
+# → response: "결제 모두 빠르게 진행될 수 있도록 경영지원팀과 협의하겠습니다."
+```
+
+**Same conversation, different personalities → different strategies:**
+
+| Persona | OCEAN | Strategy | Response Style |
+|---------|-------|----------|---------------|
+| Diligent worker (C=0.9, A=0.7, E=0.3) | ![](https://img.shields.io/badge/support-blue) | Offers help, suggests meeting | Calm, cooperative |
+| Decisive leader (E=0.8, C=0.8, A=0.4) | ![](https://img.shields.io/badge/take__charge-red) | Issues directions, coordinates | Assertive, clear |
+| Quiet newcomer (E=0.1, A=0.9, N=0.8) | ![](https://img.shields.io/badge/empathize-green) | Acknowledges difficulty, offers support | Soft, deferential |
+
 ---
 
 ## Architecture
@@ -445,6 +480,7 @@ pilot.stop()
       ├── Environment ─────── poll() events, execute() actions
       ├── EmotionDetector ─── text → PAD (auto)
       ├── DialogueManager ─── conversation continuity (OCEAN-driven)
+      ├── SocialCognition ─── read the room → personality-driven strategy
       │
       └── Brain (Facade)
             │
@@ -461,7 +497,8 @@ pilot.stop()
             │     ├── Perceiver ──── Observation → MemoryNode (LLM importance 1-10)
             │     ├── Retriever ──── Query memory with composite scoring
             │     ├── Reflector ──── Importance > 150 → focal points → insights
-            │     └── Planner ────── Recursive plan decomposition
+            │     ├── Planner ────── Recursive plan decomposition
+            │     └── SocialCog ─── Read context → personality strategy
             │
             ├── Character Cards ──── W++ / SBF / Tavern Card V2 → PersonaSpec
             │
@@ -509,6 +546,8 @@ Every `brain.chat()` call:
 | `pilot.step()` | Execute one tick of autonomous loop |
 | `pilot.run()` | Run autonomous loop until `stop()` |
 | `pilot.dialogue_state` | Current dialogue tracking state |
+| `social.read_context(text)` | Read social dynamics from conversation |
+| `social.decide_strategy(text)` | Choose personality-driven social strategy |
 | `PersonaSpec.random(**pins)` | Generate random persona, pin specific fields |
 | `OceanTraits.random(**pins)` | Generate random OCEAN, pin specific traits |
 | `PersonaSpec.from_dict(d)` | Create persona from dict (shorthand keys supported) |
@@ -554,9 +593,9 @@ Every `brain.chat()` call:
 - [Character Card V2 Spec](https://github.com/malfoyslastname/character-card-spec-v2) — Tavern Card standard
 - [Leaked System Prompts](https://github.com/jujumilk3/leaked-system-prompts) — Real-world persona patterns
 
-## Project Status (v0.2.0)
+## Project Status (v0.3.0)
 
-> **Phase: Autopilot Mode — Published on [PyPI](https://pypi.org/project/agethos/)**
+> **Phase: Social Cognition — Published on [PyPI](https://pypi.org/project/agethos/)**
 
 ### Implemented
 
@@ -574,6 +613,7 @@ Every `brain.chat()` call:
 | **Cognition: Plan** | Done | `cognition/plan.py` — daily plan, recursive decompose, replan on new observations |
 | **Cognition: Emotion** | Done | `cognition/emotion.py` — text → PAD auto-detection via LLM |
 | **Cognition: Dialogue** | Done | `cognition/dialogue.py` — OCEAN-driven conversation continuity (continue/redirect/disengage/initiate) |
+| **Cognition: Social** | Done | `cognition/social.py` — read context (atmosphere/tension/undercurrent), personality-driven social strategy (agree/empathize/challenge/take_charge/etc.) |
 | **Autopilot** | Done | `autopilot.py` — autonomous loop with step()/run(), personality-driven triggers |
 | **Environment** | Done | `environment.py` — Environment ABC + QueueEnvironment |
 | **LLM Adapters** | Done | `llm/openai.py` (OpenAI + compatible via `base_url`), `llm/anthropic.py` (Anthropic Claude) |
