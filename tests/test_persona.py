@@ -343,6 +343,77 @@ class TestFullPipeline:
         assert "Emotional State" in prompt
 
 
+# ── Random Generation ──
+
+
+class TestRandomGeneration:
+    def test_ocean_random_fully_random(self):
+        o = OceanTraits.random()
+        for field in ("openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"):
+            val = getattr(o, field)
+            assert 0.0 <= val <= 1.0
+
+    def test_ocean_random_with_pin(self):
+        o = OceanTraits.random(E=0.2, N=0.8)
+        assert o.extraversion == 0.2
+        assert o.neuroticism == 0.8
+        assert 0.0 <= o.openness <= 1.0  # random
+
+    def test_ocean_random_full_key_pin(self):
+        o = OceanTraits.random(openness=0.9)
+        assert o.openness == 0.9
+
+    def test_ocean_random_produces_variety(self):
+        """Two random calls should (almost certainly) differ."""
+        o1 = OceanTraits.random()
+        o2 = OceanTraits.random()
+        # Extremely unlikely all 5 match
+        assert (o1.openness, o1.conscientiousness, o1.extraversion) != (o2.openness, o2.conscientiousness, o2.extraversion)
+
+    def test_persona_random_fully_random(self):
+        spec = PersonaSpec.random()
+        assert spec.name
+        assert spec.ocean is not None
+        assert spec.l0_innate.traits.get("occupation")
+        assert spec.tone
+        assert len(spec.values) >= 2
+        assert len(spec.behavioral_rules) >= 2
+
+    def test_persona_random_with_name_pin(self):
+        spec = PersonaSpec.random(name="Minsoo")
+        assert spec.name == "Minsoo"
+        assert spec.ocean is not None  # random
+
+    def test_persona_random_with_partial_ocean(self):
+        spec = PersonaSpec.random(name="Test", ocean={"E": 0.1, "N": 0.9})
+        assert spec.ocean.extraversion == 0.1
+        assert spec.ocean.neuroticism == 0.9
+        assert 0.0 <= spec.ocean.openness <= 1.0  # random
+
+    def test_persona_random_with_full_ocean(self):
+        ocean = OceanTraits(openness=0.5, conscientiousness=0.5, extraversion=0.5, agreeableness=0.5, neuroticism=0.5)
+        spec = PersonaSpec.random(name="Test", ocean=ocean)
+        assert spec.ocean.openness == 0.5
+        assert spec.ocean.extraversion == 0.5
+
+    def test_persona_random_with_overrides(self):
+        spec = PersonaSpec.random(
+            name="Custom",
+            tone="Very formal",
+            values=["Honor"],
+            innate={"age": "99", "occupation": "Wizard"},
+        )
+        assert spec.name == "Custom"
+        assert spec.tone == "Very formal"
+        assert spec.values == ["Honor"]
+        assert spec.l0_innate.traits["occupation"] == "Wizard"
+
+    def test_persona_random_emotion_init(self):
+        spec = PersonaSpec.random()
+        spec.init_emotion_from_ocean()
+        assert spec.emotion is not None
+
+
 # ── PersonaSpec.from_dict / from_yaml ──
 
 

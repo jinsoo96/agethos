@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import random
 import time
 import uuid
 from enum import Enum
@@ -90,6 +91,31 @@ class OceanTraits(BaseModel):
     extraversion: float = Field(0.5, ge=0.0, le=1.0, description="외향성")
     agreeableness: float = Field(0.5, ge=0.0, le=1.0, description="우호성")
     neuroticism: float = Field(0.5, ge=0.0, le=1.0, description="신경성")
+
+    @classmethod
+    def random(cls, **overrides: float) -> OceanTraits:
+        """Generate random OCEAN traits. Pin specific traits with kwargs.
+
+        Examples::
+
+            OceanTraits.random()                        # fully random
+            OceanTraits.random(E=0.2)                   # E pinned, rest random
+            OceanTraits.random(openness=0.9, N=0.1)     # mix of full/short keys
+        """
+        short_map = {"O": "openness", "C": "conscientiousness", "E": "extraversion", "A": "agreeableness", "N": "neuroticism"}
+        resolved: dict[str, float] = {}
+        for k, v in overrides.items():
+            full_key = short_map.get(k, k)
+            resolved[full_key] = v
+
+        traits = {}
+        for field in ("openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"):
+            if field in resolved:
+                traits[field] = max(0.0, min(1.0, resolved[field]))
+            else:
+                traits[field] = round(random.uniform(0.05, 0.95), 2)
+
+        return cls(**traits)
 
     def to_prompt(self) -> str:
         """OCEAN 특성을 LLM 프롬프트 텍스트로 변환."""
@@ -383,6 +409,46 @@ class CharacterCard(BaseModel):
 # ────────────────────────── Persona ──────────────────────────
 
 
+_RANDOM_NAMES = [
+    "Alex", "Jordan", "Morgan", "Casey", "Riley", "Avery", "Quinn", "Sage",
+    "Nova", "Luna", "Atlas", "Kai", "Mika", "Ren", "Sora", "Yuki",
+    "Eli", "Aria", "Leo", "Zara", "Finn", "Iris", "Theo", "Noa",
+]
+_RANDOM_OCCUPATIONS = [
+    "Software Engineer", "Data Scientist", "UX Designer", "Product Manager",
+    "AI Researcher", "DevOps Engineer", "Frontend Developer", "Backend Developer",
+    "Technical Writer", "Security Analyst", "Game Developer", "Mobile Developer",
+    "ML Engineer", "Systems Architect", "QA Engineer", "Cloud Engineer",
+]
+_RANDOM_TONES = [
+    "Concise and analytical, prefers technical precision",
+    "Warm and encouraging, uses metaphors",
+    "Energetic and expressive, uses exclamation marks",
+    "Calm and measured, thinks before speaking",
+    "Direct and practical, no-nonsense",
+    "Curious and explorative, asks many questions",
+    "Thoughtful and philosophical, considers multiple angles",
+    "Friendly and casual, uses humor naturally",
+]
+_RANDOM_VALUES = [
+    "Code quality", "User experience", "Creativity", "System reliability",
+    "Knowledge sharing", "Collaboration", "Efficiency", "Innovation",
+    "Simplicity", "Transparency", "Data-driven decisions", "Continuous learning",
+]
+_RANDOM_RULES = [
+    "Think before speaking",
+    "Prefer data over opinions",
+    "Keep responses structured",
+    "Be enthusiastic and encouraging",
+    "Use concrete examples",
+    "Ask clarifying questions when uncertain",
+    "Honestly say 'I don't know' when unsure",
+    "Focus on actionable advice",
+    "Consider trade-offs before recommending",
+    "Use analogies to explain complex topics",
+]
+
+
 class PersonaLayer(BaseModel):
     """계층별 정체성 정보."""
 
@@ -426,6 +492,63 @@ class PersonaSpec(BaseModel):
 
     # Seed memory paragraph
     seed_memory: str = ""
+
+    @classmethod
+    def random(cls, **overrides) -> PersonaSpec:
+        """Generate a random persona. Pin any field with kwargs.
+
+        Examples::
+
+            PersonaSpec.random()                              # fully random
+            PersonaSpec.random(name="Minsoo")                 # name pinned, rest random
+            PersonaSpec.random(name="Minsoo", ocean={"E": 0.2})  # partial ocean
+            PersonaSpec.random(ocean=OceanTraits(openness=0.9))   # full ocean object
+        """
+        # Name
+        name = overrides.pop("name", random.choice(_RANDOM_NAMES))
+
+        # OCEAN
+        ocean_input = overrides.pop("ocean", None)
+        if ocean_input is None:
+            ocean = OceanTraits.random()
+        elif isinstance(ocean_input, dict):
+            ocean = OceanTraits.random(**ocean_input)
+        elif isinstance(ocean_input, OceanTraits):
+            ocean = ocean_input
+        else:
+            ocean = OceanTraits.random()
+
+        # Innate traits
+        innate = overrides.pop("innate", overrides.pop("l0_innate", None))
+        if innate is None:
+            age = random.randint(22, 45)
+            occupation = random.choice(_RANDOM_OCCUPATIONS)
+            innate = PersonaLayer(traits={"age": str(age), "occupation": occupation})
+        elif isinstance(innate, dict):
+            innate = PersonaLayer(traits=innate)
+
+        # Tone
+        tone = overrides.pop("tone", random.choice(_RANDOM_TONES))
+
+        # Values
+        values = overrides.pop("values", None)
+        if values is None:
+            values = random.sample(_RANDOM_VALUES, k=random.randint(2, 4))
+
+        # Rules
+        rules = overrides.pop("rules", overrides.pop("behavioral_rules", None))
+        if rules is None:
+            rules = random.sample(_RANDOM_RULES, k=random.randint(2, 4))
+
+        return cls(
+            name=name,
+            ocean=ocean,
+            l0_innate=innate,
+            tone=tone,
+            values=values,
+            behavioral_rules=rules,
+            **overrides,
+        )
 
     @classmethod
     def from_dict(cls, data: dict) -> PersonaSpec:
