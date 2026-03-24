@@ -6,14 +6,46 @@ from agethos.llm.base import LLMAdapter
 
 
 class OpenAIAdapter(LLMAdapter):
-    """OpenAI API LLM adapter."""
+    """OpenAI-compatible API adapter.
 
-    def __init__(self, model: str = "gpt-4o-mini", api_key: str | None = None):
+    Works with OpenAI, Qwen, Ollama, vLLM, Together AI, LM Studio, and
+    any provider that exposes an OpenAI-compatible chat completions endpoint.
+
+    Examples::
+
+        # OpenAI (default)
+        adapter = OpenAIAdapter()
+
+        # Ollama (local)
+        adapter = OpenAIAdapter(model="qwen2.5:7b", base_url="http://localhost:11434/v1")
+
+        # Qwen via DashScope
+        adapter = OpenAIAdapter(
+            model="qwen-plus",
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            api_key="sk-your-dashscope-key",
+        )
+
+        # vLLM / LM Studio
+        adapter = OpenAIAdapter(model="meta-llama/...", base_url="http://localhost:8000/v1")
+    """
+
+    def __init__(
+        self,
+        model: str = "gpt-4o-mini",
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ):
         try:
             from openai import AsyncOpenAI
         except ImportError as e:
             raise ImportError("pip install agethos[openai]") from e
-        self._client = AsyncOpenAI(api_key=api_key)
+        kwargs: dict = {}
+        if api_key is not None:
+            kwargs["api_key"] = api_key
+        if base_url is not None:
+            kwargs["base_url"] = base_url
+        self._client = AsyncOpenAI(**kwargs)
         self._model = model
 
     async def generate(

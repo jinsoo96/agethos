@@ -18,12 +18,17 @@ from agethos.persona.renderer import PersonaRenderer
 from agethos.storage.memory_store import InMemoryStore
 
 
-def _resolve_llm(provider: str, model: str | None = None, api_key: str | None = None) -> LLMAdapter:
+def _resolve_llm(
+    provider: str,
+    model: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> LLMAdapter:
     """Resolve an LLM adapter by provider name string."""
     provider = provider.lower()
     if provider == "openai":
         from agethos.llm.openai import OpenAIAdapter
-        return OpenAIAdapter(model=model or "gpt-4o-mini", api_key=api_key)
+        return OpenAIAdapter(model=model or "gpt-4o-mini", api_key=api_key, base_url=base_url)
     elif provider in ("anthropic", "claude"):
         from agethos.llm.anthropic import AnthropicAdapter
         return AnthropicAdapter(model=model or "claude-sonnet-4-20250514", api_key=api_key)
@@ -98,6 +103,7 @@ class Brain:
         llm: str | LLMAdapter,
         model: str | None = None,
         api_key: str | None = None,
+        base_url: str | None = None,
         **kwargs,
     ) -> Brain:
         """Convenience factory — build a Brain from dicts and strings.
@@ -107,19 +113,27 @@ class Brain:
             llm: An LLMAdapter instance, or a provider string ("openai", "anthropic").
             model: Model name override (e.g. "gpt-4o", "claude-opus-4-20250514").
             api_key: API key override (defaults to env var).
+            base_url: Custom API endpoint for OpenAI-compatible providers.
             **kwargs: Passed to Brain.__init__ (e.g. max_history, reflection_threshold).
 
         Examples::
 
+            # OpenAI
+            brain = Brain.build(persona={...}, llm="openai")
+
+            # Ollama (local)
             brain = Brain.build(
-                persona={"name": "Luna", "ocean": {"O": 0.9, "E": 0.3}},
-                llm="openai",
+                persona={...}, llm="openai",
+                model="qwen2.5:7b",
+                base_url="http://localhost:11434/v1",
             )
 
+            # Qwen via DashScope
             brain = Brain.build(
-                persona="personas/minsoo.yaml",  # YAML file path
-                llm="openai",
-                model="gpt-4o",
+                persona={...}, llm="openai",
+                model="qwen-plus",
+                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                api_key="sk-your-dashscope-key",
             )
         """
         # Resolve persona
@@ -130,7 +144,7 @@ class Brain:
 
         # Resolve LLM
         if isinstance(llm, str):
-            llm = _resolve_llm(llm, model=model, api_key=api_key)
+            llm = _resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
 
         return cls(persona=persona, llm=llm, **kwargs)
 
