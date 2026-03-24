@@ -325,3 +325,15 @@ class Brain:
     def decay_emotion(self, rate: float = 0.1) -> None:
         """감정 감쇠."""
         self._persona.decay_emotion(rate)
+
+    def autopilot(self, env, **kwargs):
+        """이 Brain에 연결된 Autopilot 생성.
+
+        Usage::
+
+            env = QueueEnvironment()
+            pilot = brain.autopilot(env, tick_interval=2.0)
+            actions = await pilot.step()
+        """
+        from agethos.autopilot import Autopilot
+        return Autopilot(brain=self, env=env, **kwargs)

@@ -673,3 +673,25 @@ class DailyPlan(BaseModel):
     date: str
     summary: str = ""
     items: list[PlanItem] = Field(default_factory=list)
+
+
+# ────────────────────────── Environment / Action ──────────────────────────
+
+
+class EnvironmentEvent(BaseModel):
+    """환경에서 발생한 이벤트."""
+
+    type: str = "observation"  # "observation", "message", "time_tick", "custom"
+    content: str
+    sender: str = ""
+    metadata: dict = Field(default_factory=dict)
+    timestamp: float = Field(default_factory=time.time)
+
+
+class Action(BaseModel):
+    """에이전트가 수행하는 행동."""
+
+    type: str = "speak"  # "speak", "act", "silent"
+    content: str = ""
+    target: str = ""
+    metadata: dict = Field(default_factory=dict)

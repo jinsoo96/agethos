@@ -5,6 +5,7 @@
 <p align="center">Give any LLM agent a persistent identity with psychological grounding, long-term memory with retrieval scoring, dynamic emotional state, self-reflection, and daily planning.</p>
 
 <p align="center">
+  <a href="https://pypi.org/project/agethos/"><img src="https://img.shields.io/pypi/v/agethos.svg" alt="PyPI"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
 </p>
@@ -35,7 +36,8 @@ Agethos borrows the answer from **cognitive science, personality psychology, and
 | **Reflection** | Importance threshold → focal points → insights | Same approach | None | None |
 | **Persona evolution** | L2 dynamic + emotion drift | L2 daily update | Static | Static |
 | **Character card formats** | W++, SBF, Tavern Card V2 | None | None | Native |
-| **LLM-agnostic** | OpenAI, Anthropic, custom | OpenAI only | Various | N/A |
+| **Autopilot mode** | OCEAN-driven triggers + dialogue continuity | None | Task-based | None |
+| **LLM-agnostic** | OpenAI, Anthropic, custom (`base_url`) | OpenAI only | Various | N/A |
 
 ---
 
@@ -387,32 +389,85 @@ reply = await brain.chat("I have another presentation next month.")
 # Dr. Lee's response draws on stored memories and reflections
 ```
 
+### Autopilot Mode — Autonomous Agent
+
+```python
+from agethos import Brain, Autopilot, QueueEnvironment, EnvironmentEvent
+
+brain = Brain.build(
+    persona={
+        "name": "Minsoo",
+        "ocean": {"O": 0.8, "C": 0.9, "E": 0.8, "A": 0.6, "N": 0.3},
+    },
+    llm="openai",
+)
+env = QueueEnvironment()
+pilot = brain.autopilot(env)
+
+# Push events — agent reacts autonomously
+await env.push(EnvironmentEvent(type="message", content="How's the project?", sender="PM"))
+actions = await pilot.step()
+# Minsoo (E=0.8) responds eagerly — emotion auto-detected, dialogue tracked
+
+# No events? High-E agents initiate conversation on their own
+actions = await pilot.step()  # idle → may speak proactively
+
+# Check dialogue state
+print(pilot.dialogue_state)
+# {"topic": "project status", "turn_count": 2, "energy": 0.8, ...}
+```
+
+**Personality-driven triggers:**
+
+| OCEAN Trait | High | Low |
+|-------------|------|-----|
+| **E (Extraversion)** | Responds eagerly, initiates after 1 idle tick | Stays silent, initiates after 5+ idle ticks |
+| **N (Neuroticism)** | Strong emotional reaction to negative events | Calm, small emotional shifts |
+| **O (Openness)** | Freely redirects to new topics | Stays on current topic |
+| **A (Agreeableness)** | Follows conversation partner's lead | Disengages if nothing to add |
+
+**Run as background loop:**
+
+```python
+import asyncio
+
+task = asyncio.create_task(pilot.run())  # polls every 1s
+# ... later
+pilot.stop()
+```
+
 ---
 
 ## Architecture
 
-    Brain (Facade)
+    Autopilot (autonomous loop)
       │
-      ├── PersonaRenderer ──── PersonaSpec → system prompt
-      │     ├── PersonaSpec ── L0/L1/L2 + 6 facets + behavioral rules
-      │     ├── OceanTraits ── Big Five numerical scores → prompt text
-      │     └── EmotionalState  PAD 3-axis → closest emotion → prompt text
+      ├── Environment ─────── poll() events, execute() actions
+      ├── EmotionDetector ─── text → PAD (auto)
+      ├── DialogueManager ─── conversation continuity (OCEAN-driven)
       │
-      ├── MemoryStream ─────── Append, retrieve, importance tracking
-      │     ├── Retrieval ──── recency × importance × relevance scoring
-      │     └── StorageBackend (ABC) ── InMemoryStore / custom
-      │
-      ├── Cognition
-      │     ├── Perceiver ──── Observation → MemoryNode (LLM importance 1-10)
-      │     ├── Retriever ──── Query memory with composite scoring
-      │     ├── Reflector ──── Importance > 150 → focal points → insights
-      │     └── Planner ────── Recursive plan decomposition
-      │
-      ├── Character Cards ──── W++ / SBF / Tavern Card V2 → PersonaSpec
-      │
-      └── Adapters
-            ├── LLMAdapter (ABC) ── OpenAI / Anthropic / custom
-            └── EmbeddingAdapter (ABC) ── OpenAI / custom
+      └── Brain (Facade)
+            │
+            ├── PersonaRenderer ──── PersonaSpec → system prompt
+            │     ├── PersonaSpec ── L0/L1/L2 + 6 facets + behavioral rules
+            │     ├── OceanTraits ── Big Five numerical scores → prompt text
+            │     └── EmotionalState  PAD 3-axis → closest emotion → prompt text
+            │
+            ├── MemoryStream ─────── Append, retrieve, importance tracking
+            │     ├── Retrieval ──── recency × importance × relevance scoring
+            │     └── StorageBackend (ABC) ── InMemoryStore / custom
+            │
+            ├── Cognition
+            │     ├── Perceiver ──── Observation → MemoryNode (LLM importance 1-10)
+            │     ├── Retriever ──── Query memory with composite scoring
+            │     ├── Reflector ──── Importance > 150 → focal points → insights
+            │     └── Planner ────── Recursive plan decomposition
+            │
+            ├── Character Cards ──── W++ / SBF / Tavern Card V2 → PersonaSpec
+            │
+            └── Adapters
+                  ├── LLMAdapter (ABC) ── OpenAI / Anthropic / custom (base_url)
+                  └── EmbeddingAdapter (ABC) ── OpenAI / custom
 
 ## Cognitive Loop
 
@@ -450,6 +505,10 @@ Every `brain.chat()` call:
 | `brain.decay_emotion(rate)` | Decay emotion toward personality baseline |
 | `brain.update_situation(**traits)` | Update L2 situation layer dynamically |
 | `brain.clear_history()` | Clear multi-turn conversation history |
+| `brain.autopilot(env)` | Create Autopilot attached to this brain |
+| `pilot.step()` | Execute one tick of autonomous loop |
+| `pilot.run()` | Run autonomous loop until `stop()` |
+| `pilot.dialogue_state` | Current dialogue tracking state |
 | `PersonaSpec.random(**pins)` | Generate random persona, pin specific fields |
 | `OceanTraits.random(**pins)` | Generate random OCEAN, pin specific traits |
 | `PersonaSpec.from_dict(d)` | Create persona from dict (shorthand keys supported) |
@@ -466,6 +525,8 @@ Every `brain.chat()` call:
 | `MemoryNode` | SPO triple, importance, embedding, evidence pointers |
 | `DailyPlan` | Recursive PlanItems with time ranges and status |
 | `RetrievalResult` | Node + score breakdown (recency, importance, relevance) |
+| `EnvironmentEvent` | Event from environment (message, observation, custom) |
+| `Action` | Agent action output (speak, act, silent) |
 
 ## Algorithms
 
@@ -493,16 +554,16 @@ Every `brain.chat()` call:
 - [Character Card V2 Spec](https://github.com/malfoyslastname/character-card-spec-v2) — Tavern Card standard
 - [Leaked System Prompts](https://github.com/jujumilk3/leaked-system-prompts) — Real-world persona patterns
 
-## Project Status (v0.1.0)
+## Project Status (v0.2.0)
 
-> **Phase: Core Architecture Complete — Pre-release**
+> **Phase: Autopilot Mode — Published on [PyPI](https://pypi.org/project/agethos/)**
 
 ### Implemented
 
 | Module | Status | Files |
 |--------|--------|-------|
-| **Data Models** | Done | `models.py` — OceanTraits, EmotionalState, PersonaSpec, PersonaLayer, CharacterCard, MemoryNode, PlanItem, DailyPlan, RetrievalResult |
-| **Brain Facade** | Done | `brain.py` — chat, observe, plan_day, reflect, recall, emotion control |
+| **Data Models** | Done | `models.py` — OceanTraits, EmotionalState, PersonaSpec, PersonaLayer, CharacterCard, MemoryNode, PlanItem, DailyPlan, RetrievalResult, EnvironmentEvent, Action |
+| **Brain Facade** | Done | `brain.py` — chat, observe, plan_day, reflect, recall, emotion control, autopilot |
 | **Persona Renderer** | Done | `persona/renderer.py` — ISS + OCEAN + emotion + memories + plan → system prompt |
 | **Memory Stream** | Done | `memory/stream.py` — append, retrieve (composite scoring), get_recent, importance tracking |
 | **Retrieval Scoring** | Done | `memory/retrieval.py` — recency × importance × relevance, min-max normalization, cosine similarity |
@@ -511,14 +572,18 @@ Every `brain.chat()` call:
 | **Cognition: Retrieve** | Done | `cognition/retrieve.py` — composite scoring wrapper, reflection-specific retrieval |
 | **Cognition: Reflect** | Done | `cognition/reflect.py` — importance threshold → focal points → insights → depth=2+ nodes |
 | **Cognition: Plan** | Done | `cognition/plan.py` — daily plan, recursive decompose, replan on new observations |
-| **LLM Adapters** | Done | `llm/openai.py` (OpenAI), `llm/anthropic.py` (Anthropic Claude) |
+| **Cognition: Emotion** | Done | `cognition/emotion.py` — text → PAD auto-detection via LLM |
+| **Cognition: Dialogue** | Done | `cognition/dialogue.py` — OCEAN-driven conversation continuity (continue/redirect/disengage/initiate) |
+| **Autopilot** | Done | `autopilot.py` — autonomous loop with step()/run(), personality-driven triggers |
+| **Environment** | Done | `environment.py` — Environment ABC + QueueEnvironment |
+| **LLM Adapters** | Done | `llm/openai.py` (OpenAI + compatible via `base_url`), `llm/anthropic.py` (Anthropic Claude) |
 | **Embedding Adapter** | Done | `embedding/openai.py` (text-embedding-3-small/large/ada-002) |
 | **Character Cards** | Done | `models.py` — W++ parser, SBF parser, Tavern Card V2 → PersonaSpec conversion |
-
 | **Multi-turn Chat** | Done | `brain.py` — sliding window conversation history (max_history) |
 | **Factory Methods** | Done | `Brain.build()` from dict/yaml/string, `PersonaSpec.from_dict()`, `from_yaml()` |
 | **Random Generation** | Done | `OceanTraits.random()`, `PersonaSpec.random()` with partial pinning |
 | **YAML Personas** | Done | `examples/personas/` — load persona from YAML file |
+| **CI/CD** | Done | `.github/workflows/` — CI tests + PyPI publish via trusted publisher |
 
 ### Not Yet Implemented
 
@@ -526,10 +591,9 @@ Every `brain.chat()` call:
 |------|-------|
 | Persistent storage backend | SQLite, Redis, etc. — currently InMemory only |
 | Anthropic embedding adapter | Only OpenAI embeddings available |
-| PyPI publish | Package configured (`pyproject.toml`) but not yet published |
-| CI/CD | No GitHub Actions / workflows |
 | Tavern Card V2 export | Import only, no export to card format |
 | L1/L2 persona auto-evolution | Layers exist but no automatic update logic from interactions |
+| Plan-based proactive actions | Autopilot reacts to events but doesn't yet execute plans on schedule |
 
 ---
 
