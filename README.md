@@ -2,7 +2,7 @@
 
 <p align="center">A brain for AI agents — persona, memory, reflection, and planning in one library.</p>
 
-<p align="center">Give any LLM agent a persistent identity with psychological grounding, long-term memory with retrieval scoring, dynamic emotional state, self-reflection, and daily planning.<br>Inspired by <a href="https://arxiv.org/abs/2304.03442">Generative Agents</a>, <a href="https://github.com/PlateerLab/synaptic-memory">Synaptic Memory</a>, and cognitive science.</p>
+<p align="center">Give any LLM agent a persistent identity with psychological grounding, long-term memory with retrieval scoring, dynamic emotional state, self-reflection, and daily planning.</p>
 
 <p align="center">
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python"></a>
