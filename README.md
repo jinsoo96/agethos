@@ -485,7 +485,6 @@ Every `brain.chat()` call:
 ## References
 
 - [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442) — Memory stream, reflection, planning
-- [Synaptic Memory](https://github.com/PlateerLab/synaptic-memory) — Brain-inspired knowledge graph, Hebbian learning
 - [Mehrabian PAD Model (1996)](https://en.wikipedia.org/wiki/PAD_emotional_state_model) — Pleasure-Arousal-Dominance emotional space
 - [Big Five / OCEAN](https://en.wikipedia.org/wiki/Big_Five_personality_traits) — Five-factor personality model
 - [BIG5-CHAT (2024)](https://openreview.net/pdf?id=TqwTzLjzGS) — Big Five personality in LLM conversations
