@@ -208,78 +208,183 @@ reply = await brain.chat("How's the recommendation system going?")
 reply2 = await brain.chat("Can you elaborate on the caching part?")
 ```
 
-### 2. Emotional Events
+### 4. Emotional Events
 
 ```python
-from agethos.models import EmotionalState
-
 # Apply an event that triggers emotion
 brain.apply_event_emotion((-0.5, 0.4, -0.3))  # criticism → sadness/anger
 print(brain.emotion.closest_emotion())  # "sadness"
-print(brain.emotion.to_prompt())  # "Current emotional state: sadness (P=-0.12, A=+0.15, D=+0.02)"
 
 # Emotion decays back to OCEAN baseline over time
 brain.decay_emotion(rate=0.1)
 ```
 
-### 3. Character Card Import (W++ / SBF / Tavern Card)
+### 5. Random Persona Generation
+
+```python
+from agethos import PersonaSpec, OceanTraits
+
+# Fully random persona
+spec = PersonaSpec.random()
+
+# Pin what you want, randomize the rest
+spec = PersonaSpec.random(name="Minsoo", ocean={"E": 0.2, "N": 0.8})
+
+# Random OCEAN only
+ocean = OceanTraits.random()
+ocean = OceanTraits.random(E=0.2)  # pin extraversion, randomize rest
+
+# Random persona → Brain in one line
+brain = Brain.build(persona=PersonaSpec.random(), llm="openai")
+```
+
+### 6. Character Card Import (W++ / SBF / Tavern Card)
 
 ```python
 from agethos import CharacterCard
 
-# From W++ format
 card = CharacterCard.from_wpp('''
 [character("Luna")
 {
   Personality("analytical" + "curious" + "dry humor")
   Age("25")
   Occupation("AI Researcher")
-  Speech("precise" + "uses scientific metaphors")
 }]
 ''')
-persona = card.to_persona_spec()
-brain = Brain(persona=persona, llm=OpenAIAdapter())
-
-# From SBF format
-card = CharacterCard.from_sbf('''
-[character: Marcus;
-personality: stoic, loyal, pragmatic;
-occupation: mercenary captain;
-speech: blunt, few words, deep voice]
-''')
-
-# From Tavern Card V2 JSON
-import json
-card = CharacterCard(**json.loads(tavern_card_json)["data"])
+brain = Brain.build(persona=card.to_persona_spec(), llm="openai")
 ```
 
-### 4. Full Cognitive Loop
+---
+
+## Usage Recipes
+
+### Customer Support Bot with Personality
 
 ```python
-import asyncio
+brain = Brain.build(
+    persona={
+        "name": "Hana",
+        "ocean": {"O": 0.5, "C": 0.9, "E": 0.7, "A": 0.95, "N": 0.1},
+        "innate": {"role": "Customer Support Agent"},
+        "tone": "Friendly, patient, solution-oriented",
+        "values": ["Customer satisfaction", "Clear communication"],
+        "rules": [
+            "Always acknowledge the customer's frustration first",
+            "Provide step-by-step solutions",
+            "Escalate if unable to resolve in 3 exchanges",
+        ],
+        "boundaries": ["Never share internal system details", "Never make promises about timelines"],
+    },
+    llm="openai",
+)
 
-async def main():
-    brain = Brain(persona=persona, llm=OpenAIAdapter())
+reply = await brain.chat("My order has been stuck for 3 days!")
+# Hana responds with high agreeableness + low neuroticism → calm, empathetic, structured
+```
 
-    # Chat — perceive → retrieve → render(persona+emotion+memories) → generate
-    reply = await brain.chat("Hello!")
+### NPC in a Game — Emotional Reactions
 
-    # Observe — record events, auto-reflect when importance > 150
-    await brain.observe("Team meeting: deadline moved to next week")
+```python
+npc = Brain.build(
+    persona={
+        "name": "Gareth",
+        "ocean": {"O": 0.3, "C": 0.8, "E": 0.4, "A": 0.3, "N": 0.7},
+        "innate": {"role": "Town Guard", "age": "42"},
+        "tone": "Gruff, suspicious, speaks in short sentences",
+        "rules": ["Never reveal patrol routes", "Distrust strangers by default"],
+    },
+    llm="openai",
+)
 
-    # Apply emotional impact of the event
-    brain.apply_event_emotion((-0.3, 0.5, -0.2))  # stress
+reply = await npc.chat("I need to enter the castle.")
+# Low A + high N → suspicious, terse response
 
-    # Plan — generate daily plan from persona + memories
-    plan = await brain.plan_day("2026-03-25", context="Deadline moved up")
+# Player does something threatening
+npc.apply_event_emotion((-0.6, 0.7, 0.3))  # anger + high arousal
+reply = await npc.chat("I said let me through!")
+# Now responding with anger-influenced tone
 
-    # Recall — search memories by composite score
-    results = await brain.recall("deadline discussions")
+# After time passes, Gareth calms down
+for _ in range(5):
+    npc.decay_emotion(rate=0.2)
+```
 
-    # Reflect — manual trigger
-    insights = await brain.reflect()
+### Multi-Agent Conversation
 
-asyncio.run(main())
+```python
+agents = {
+    "pm": Brain.build(
+        persona={"name": "Sara", "ocean": {"O": 0.7, "C": 0.8, "E": 0.8, "A": 0.7, "N": 0.3},
+                 "innate": {"role": "Product Manager"}, "tone": "Big-picture, decisive"},
+        llm="openai",
+    ),
+    "eng": Brain.build(
+        persona={"name": "Jin", "ocean": {"O": 0.6, "C": 0.9, "E": 0.2, "A": 0.5, "N": 0.2},
+                 "innate": {"role": "Staff Engineer"}, "tone": "Technical, cautious about scope"},
+        llm="openai",
+    ),
+}
+
+# Simulate a discussion
+topic = "Should we rewrite the auth system before launch?"
+pm_reply = await agents["pm"].chat(topic)
+eng_reply = await agents["eng"].chat(f"Sara (PM) said: {pm_reply}\n\nWhat do you think?")
+```
+
+### Bulk Random Agents for Simulation
+
+```python
+# Spawn 10 random agents for a social simulation
+agents = [
+    Brain.build(persona=PersonaSpec.random(), llm="openai")
+    for _ in range(10)
+]
+
+# Each has unique personality, tone, values, and emotional baseline
+for agent in agents:
+    p = agent.persona
+    print(f"{p.name} | E={p.ocean.extraversion:.2f} N={p.ocean.neuroticism:.2f} | {p.tone}")
+```
+
+### Situation-Aware Responses
+
+```python
+brain = Brain.build(
+    persona={"name": "Alex", "ocean": {"O": 0.7, "C": 0.6, "E": 0.5, "A": 0.7, "N": 0.4}},
+    llm="openai",
+)
+
+# Update L2 situation layer dynamically
+brain.update_situation(location="job interview", mood="nervous")
+reply = await brain.chat("Tell me about yourself.")
+# Response shaped by interview context
+
+brain.update_situation(location="bar with friends", mood="relaxed")
+reply = await brain.chat("Tell me about yourself.")
+# Same question, completely different tone and content
+```
+
+### Memory + Reflection in Long Conversations
+
+```python
+brain = Brain.build(
+    persona={"name": "Dr. Lee", "ocean": {"O": 0.8, "C": 0.7, "E": 0.5, "A": 0.8, "N": 0.3},
+             "innate": {"role": "Therapist"}},
+    llm="openai",
+)
+
+# Session 1: patient shares concerns
+await brain.observe("Patient expressed anxiety about upcoming presentation")
+await brain.observe("Patient mentioned difficulty sleeping for the past week")
+await brain.observe("Patient has a history of public speaking fear since college")
+
+# Automatic reflection triggers when importance accumulates > 150
+# Brain synthesizes: "Patient's sleep issues may be linked to presentation anxiety,
+#                     rooted in long-standing public speaking fear"
+
+# Later: memories inform future responses
+reply = await brain.chat("I have another presentation next month.")
+# Dr. Lee's response draws on stored memories and reflections
 ```
 
 ---
@@ -335,6 +440,7 @@ Every `brain.chat()` call:
 
 | Method | Description |
 |--------|-------------|
+| `Brain.build(persona, llm)` | Factory — create Brain from dict/yaml/string |
 | `brain.chat(message)` | Full cognitive loop — perceive, retrieve, render, generate, reflect |
 | `brain.observe(text)` | Record external event, auto-reflect if threshold exceeded |
 | `brain.plan_day(date)` | Generate daily plan from persona and memories |
@@ -343,6 +449,11 @@ Every `brain.chat()` call:
 | `brain.apply_event_emotion(pad)` | Shift emotional state by event PAD values |
 | `brain.decay_emotion(rate)` | Decay emotion toward personality baseline |
 | `brain.update_situation(**traits)` | Update L2 situation layer dynamically |
+| `brain.clear_history()` | Clear multi-turn conversation history |
+| `PersonaSpec.random(**pins)` | Generate random persona, pin specific fields |
+| `OceanTraits.random(**pins)` | Generate random OCEAN, pin specific traits |
+| `PersonaSpec.from_dict(d)` | Create persona from dict (shorthand keys supported) |
+| `PersonaSpec.from_yaml(path)` | Load persona from YAML file |
 
 ## Data Models
 
@@ -405,14 +516,17 @@ Every `brain.chat()` call:
 | **Embedding Adapter** | Done | `embedding/openai.py` (text-embedding-3-small/large/ada-002) |
 | **Character Cards** | Done | `models.py` — W++ parser, SBF parser, Tavern Card V2 → PersonaSpec conversion |
 
+| **Multi-turn Chat** | Done | `brain.py` — sliding window conversation history (max_history) |
+| **Factory Methods** | Done | `Brain.build()` from dict/yaml/string, `PersonaSpec.from_dict()`, `from_yaml()` |
+| **Random Generation** | Done | `OceanTraits.random()`, `PersonaSpec.random()` with partial pinning |
+| **YAML Personas** | Done | `examples/personas/` — load persona from YAML file |
+
 ### Not Yet Implemented
 
 | Item | Notes |
 |------|-------|
-| Unit / integration tests | `tests/` directory exists but empty |
 | Persistent storage backend | SQLite, Redis, etc. — currently InMemory only |
 | Anthropic embedding adapter | Only OpenAI embeddings available |
-| Multi-turn conversation history | Brain.chat() is single-turn (no message history accumulation) |
 | PyPI publish | Package configured (`pyproject.toml`) but not yet published |
 | CI/CD | No GitHub Actions / workflows |
 | Tavern Card V2 export | Import only, no export to card format |
