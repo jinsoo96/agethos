@@ -1,4 +1,4 @@
-"""LLM 호출 추상 인터페이스."""
+"""LLM call abstract interface."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 
 
 class LLMAdapter(ABC):
-    """텍스트 생성용 LLM 추상화."""
+    """Text generation LLM abstraction."""
 
     @abstractmethod
     async def generate(
@@ -16,8 +16,28 @@ class LLMAdapter(ABC):
         user_prompt: str,
         temperature: float = 0.7,
     ) -> str:
-        """텍스트 생성 → 문자열 반환."""
+        """Generate text → return string."""
         ...
+
+    async def generate_with_history(
+        self,
+        system_prompt: str,
+        history: list[dict[str, str]],
+        user_prompt: str,
+        temperature: float = 0.7,
+    ) -> str:
+        """Generate with multi-turn conversation history.
+
+        Default implementation ignores history and falls back to single-turn.
+        Subclasses should override for proper multi-turn support.
+
+        Args:
+            system_prompt: System prompt.
+            history: List of {"role": "user"|"assistant", "content": "..."} dicts.
+            user_prompt: Current user message.
+            temperature: Sampling temperature.
+        """
+        return await self.generate(system_prompt, user_prompt, temperature)
 
     async def generate_json(
         self,

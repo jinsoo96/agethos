@@ -1,11 +1,13 @@
-# Agethos
+<h1 align="center">Agethos</h1>
 
-A brain for AI agents — persona, memory, reflection, and planning in one library.
+<p align="center">A brain for AI agents — persona, memory, reflection, and planning in one library.</p>
 
-Give any LLM agent a persistent identity with psychological grounding, long-term memory with retrieval scoring, dynamic emotional state, self-reflection, and daily planning. Inspired by [Generative Agents](https://arxiv.org/abs/2304.03442), [Synaptic Memory](https://github.com/PlateerLab/synaptic-memory), and cognitive science.
+<p align="center">Give any LLM agent a persistent identity with psychological grounding, long-term memory with retrieval scoring, dynamic emotional state, self-reflection, and daily planning.<br>Inspired by <a href="https://arxiv.org/abs/2304.03442">Generative Agents</a>, <a href="https://github.com/PlateerLab/synaptic-memory">Synaptic Memory</a>, and cognitive science.</p>
 
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
+</p>
 
 ---
 
@@ -136,7 +138,44 @@ Two agents with identical questions, different OCEAN profiles — tested with `g
 
 ## Quick Start
 
-### 1. OCEAN-based Persona
+### 1. One-liner with `Brain.build()`
+
+```python
+from agethos import Brain
+
+brain = Brain.build(
+    persona={
+        "name": "Minsoo",
+        "ocean": {"O": 0.8, "C": 0.9, "E": 0.2, "A": 0.6, "N": 0.3},
+        "innate": {"age": "28", "occupation": "Backend Engineer"},
+        "tone": "Concise and analytical",
+        "rules": ["Prefer data over opinions", "Keep responses structured"],
+    },
+    llm="openai",  # or "anthropic"
+)
+reply = await brain.chat("How's the recommendation system going?")
+```
+
+### 2. From YAML file
+
+```yaml
+# personas/minsoo.yaml
+name: Minsoo
+ocean: { O: 0.8, C: 0.9, E: 0.2, A: 0.6, N: 0.3 }
+innate:
+  age: "28"
+  occupation: Backend Engineer
+tone: Concise and analytical
+rules:
+  - Prefer data over opinions
+  - Keep responses structured
+```
+
+```python
+brain = Brain.build(persona="personas/minsoo.yaml", llm="openai")
+```
+
+### 3. Full control (traditional style)
 
 ```python
 from agethos import Brain, PersonaSpec, PersonaLayer, OceanTraits
@@ -163,8 +202,10 @@ persona = PersonaSpec(
     ],
 )
 
-brain = Brain(persona=persona, llm=OpenAIAdapter())
+brain = Brain(persona=persona, llm=OpenAIAdapter(), max_history=20)
 reply = await brain.chat("How's the recommendation system going?")
+# Multi-turn: brain remembers conversation history automatically
+reply2 = await brain.chat("Can you elaborate on the caching part?")
 ```
 
 ### 2. Emotional Events

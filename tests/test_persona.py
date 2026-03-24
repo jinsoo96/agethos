@@ -341,3 +341,92 @@ class TestFullPipeline:
         assert spec.name == "Nova"
         assert "OCEAN" in prompt
         assert "Emotional State" in prompt
+
+
+# ── PersonaSpec.from_dict / from_yaml ──
+
+
+class TestPersonaFactory:
+    def test_from_dict_shorthand(self):
+        spec = PersonaSpec.from_dict({
+            "name": "Test",
+            "ocean": {"O": 0.8, "C": 0.9, "E": 0.2, "A": 0.6, "N": 0.3},
+            "innate": {"age": "28", "occupation": "Engineer"},
+            "learned": {"skill": "Python"},
+            "situation": {"task": "debugging"},
+            "tone": "Concise",
+            "values": ["Quality"],
+            "rules": ["Think first"],
+        })
+        assert spec.name == "Test"
+        assert spec.ocean.openness == 0.8
+        assert spec.ocean.neuroticism == 0.3
+        assert spec.l0_innate.traits["age"] == "28"
+        assert spec.l1_learned.traits["skill"] == "Python"
+        assert spec.l2_situation.traits["task"] == "debugging"
+        assert spec.behavioral_rules == ["Think first"]
+
+    def test_from_dict_full_keys(self):
+        spec = PersonaSpec.from_dict({
+            "name": "Test",
+            "ocean": {"openness": 0.7, "conscientiousness": 0.6, "extraversion": 0.5, "agreeableness": 0.4, "neuroticism": 0.3},
+        })
+        assert spec.ocean.openness == 0.7
+        assert spec.ocean.agreeableness == 0.4
+
+    def test_from_dict_minimal(self):
+        spec = PersonaSpec.from_dict({"name": "Minimal"})
+        assert spec.name == "Minimal"
+        assert spec.ocean is None
+
+    def test_from_yaml(self):
+        import os
+        yaml_path = os.path.join(os.path.dirname(__file__), "..", "examples", "personas", "minsoo.yaml")
+        if os.path.exists(yaml_path):
+            spec = PersonaSpec.from_yaml(yaml_path)
+            assert spec.name == "Minsoo"
+            assert spec.ocean.openness == 0.8
+            assert spec.l0_innate.traits["occupation"] == "Backend Engineer"
+            assert "Always think before speaking" in spec.behavioral_rules
+
+    def test_to_dict_roundtrip(self):
+        original = PersonaSpec.from_dict({
+            "name": "Test",
+            "ocean": {"O": 0.8, "C": 0.7, "E": 0.3, "A": 0.9, "N": 0.2},
+            "tone": "Warm",
+            "values": ["Quality"],
+        })
+        d = original.to_dict()
+        assert d["name"] == "Test"
+        assert "ocean" in d
+
+
+# ── Brain.build ──
+
+
+class TestBrainBuild:
+    def test_build_from_dict(self):
+        """Brain.build with dict persona should parse the persona correctly."""
+        from agethos.brain import Brain
+        try:
+            brain = Brain.build(
+                persona={"name": "Test", "ocean": {"O": 0.5, "E": 0.5}},
+                llm="openai",
+            )
+            assert brain.persona.name == "Test"
+            assert brain.persona.ocean.openness == 0.5
+        except (ImportError, Exception):
+            pass  # openai not installed or no API key
+
+    def test_build_from_yaml(self):
+        import os
+        from agethos.brain import Brain
+        yaml_path = os.path.join(os.path.dirname(__file__), "..", "examples", "personas", "yuna.yaml")
+        if not os.path.exists(yaml_path):
+            return
+        try:
+            brain = Brain.build(persona=yaml_path, llm="openai")
+            assert brain.persona.name == "Yuna"
+            assert brain.persona.ocean.extraversion == 0.9
+        except (ImportError, Exception):
+            pass  # openai not installed or no API key

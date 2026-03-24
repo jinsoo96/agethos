@@ -427,6 +427,66 @@ class PersonaSpec(BaseModel):
     # Seed memory paragraph
     seed_memory: str = ""
 
+    @classmethod
+    def from_dict(cls, data: dict) -> PersonaSpec:
+        """Create PersonaSpec from a plain dict or YAML-loaded dict.
+
+        Supports flat shorthand keys for convenience::
+
+            PersonaSpec.from_dict({
+                "name": "Minsoo",
+                "ocean": {"O": 0.8, "C": 0.9, "E": 0.2, "A": 0.6, "N": 0.3},
+                "innate": {"age": "28", "occupation": "Engineer"},
+                "learned": {"skill": "Python"},
+                "situation": {"task": "debugging"},
+                "tone": "Concise",
+                "values": ["Code quality"],
+                "rules": ["Think before speaking"],
+            })
+        """
+        d = dict(data)
+
+        # Shorthand ocean keys: {O, C, E, A, N} or {openness, ...}
+        if "ocean" in d and isinstance(d["ocean"], dict):
+            o = d["ocean"]
+            d["ocean"] = OceanTraits(
+                openness=o.get("O", o.get("openness", 0.5)),
+                conscientiousness=o.get("C", o.get("conscientiousness", 0.5)),
+                extraversion=o.get("E", o.get("extraversion", 0.5)),
+                agreeableness=o.get("A", o.get("agreeableness", 0.5)),
+                neuroticism=o.get("N", o.get("neuroticism", 0.5)),
+            )
+
+        # Shorthand layer keys
+        for short, full in [("innate", "l0_innate"), ("learned", "l1_learned"), ("situation", "l2_situation")]:
+            if short in d:
+                d[full] = PersonaLayer(traits=d.pop(short))
+
+        # Wrap existing dicts as PersonaLayer
+        for key in ("l0_innate", "l1_learned", "l2_situation"):
+            if key in d and isinstance(d[key], dict) and "traits" not in d[key]:
+                d[key] = PersonaLayer(traits=d[key])
+
+        # Shorthand rules → behavioral_rules
+        if "rules" in d:
+            d["behavioral_rules"] = d.pop("rules")
+
+        return cls(**d)
+
+    @classmethod
+    def from_yaml(cls, path: str) -> PersonaSpec:
+        """Load PersonaSpec from a YAML file."""
+        import yaml
+        with open(path) as f:
+            data = yaml.safe_load(f)
+        return cls.from_dict(data)
+
+    def to_dict(self) -> dict:
+        """Export to a plain dict (YAML-friendly)."""
+        d = self.model_dump(exclude_none=True, exclude_defaults=True)
+        d["name"] = self.name
+        return d
+
     def init_emotion_from_ocean(self) -> None:
         """OCEAN 특성에서 감정 baseline 초기화."""
         if self.ocean and not self.emotion:
