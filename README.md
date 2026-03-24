@@ -96,6 +96,37 @@ Retrieval scoring from the Generative Agents paper:
 
 ---
 
+## Demo Results
+
+Two agents with identical questions, different OCEAN profiles — tested with `gpt-4o-mini`:
+
+| | **Minsoo** (Introvert Engineer) | **Yuna** (Extrovert Designer) |
+|---|---|---|
+| **OCEAN** | O=0.8 C=0.9 **E=0.2** A=0.6 **N=0.3** | O=0.9 C=0.4 **E=0.9** A=0.8 **N=0.6** |
+| **Baseline emotion** | calm (P=+0.34) | pride (P=+0.55) |
+| **Response style** | Numbered lists, structured, no emojis, short | Emojis, metaphors, exclamation marks, follow-up questions |
+| **"AI replacing jobs?"** | "A balanced approach is essential to leverage AI's capabilities while ensuring job security..." | "It's like standing at a crossroads! On one hand AI can streamline tasks... What are your thoughts? 🚀✨" |
+| **After criticism event** | calm → calm (P=+0.34→+0.13, small shift) | pride → pride (P=+0.55→+0.19, larger shift) |
+| **Emotion decay (10 steps)** | P=+0.13 → +0.32 (recovers toward baseline) | P=+0.19 → +0.51 (recovers toward baseline) |
+
+> **Key takeaway**: Same LLM, same question — personality shapes tone, structure, emotional reactivity, and recovery. High Neuroticism (N) amplifies emotional response to negative events.
+
+### Try it yourself
+
+    # Compare two agents side-by-side
+    python examples/demo_persona.py compare
+
+    # Interactive chat with a specific agent
+    python examples/demo_persona.py chat minsoo
+    python examples/demo_persona.py chat yuna
+
+    # In interactive mode:
+    #   :emo -0.5 0.4 -0.3   → apply emotional event
+    #   :decay                → decay emotion toward baseline
+    #   :q                    → quit
+
+---
+
 ## Install
 
     pip install agethos                    # Core (pydantic only)
