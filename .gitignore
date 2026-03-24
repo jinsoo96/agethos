@@ -1,6 +1,7 @@
 .claude/
 .venv/
 .env
+blueprint.md
 __pycache__/
 *.pyc
 *.egg-info/
