@@ -6,13 +6,13 @@ from agethos.llm.base import LLMAdapter
 from agethos.models import MemoryNode, NodeType
 
 _IMPORTANCE_PROMPT = """\
-다음 관찰/사건의 중요도를 1~10 정수로 평가하세요.
-1 = 일상적이고 사소한 (예: 이를 닦음)
-10 = 극적이고 인생을 바꾸는 (예: 이별, 승진)
+Rate the importance of the following observation on a scale of 1 to 10.
+1 = mundane and trivial (e.g. brushing teeth)
+10 = dramatic and life-changing (e.g. breakup, promotion)
 
-관찰: {observation}
+Observation: {observation}
 
-JSON 형식으로 응답: {{"importance": <정수>, "subject": "<주어>", "predicate": "<동사>", "object": "<목적어>", "keywords": ["<키워드1>", "<키워드2>"]}}"""
+Respond in JSON: {{"importance": <integer>, "subject": "<subject>", "predicate": "<verb>", "object": "<object>", "keywords": ["<keyword1>", "<keyword2>"]}}"""
 
 
 class Perceiver:
@@ -32,7 +32,7 @@ class Perceiver:
         """관찰 → MemoryNode."""
         try:
             data = await self._llm.generate_json(
-                system_prompt="당신은 관찰을 분석하는 도우미입니다.",
+                system_prompt="You are a helper that analyzes observations.",
                 user_prompt=_IMPORTANCE_PROMPT.format(observation=observation),
             )
             return MemoryNode(

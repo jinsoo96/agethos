@@ -10,39 +10,39 @@ from agethos.llm.base import LLMAdapter
 from agethos.models import DailyPlan, MemoryNode, PersonaSpec, PlanItem
 
 _DAILY_PLAN_PROMPT = """\
-당신은 {name}입니다.
+You are {name}.
 {persona_context}
 
-날짜: {date}
+Date: {date}
 {context}
 
-오늘의 일정을 5~8개의 주요 활동으로 계획하세요.
-각 활동에는 시간대와 예상 소요 시간을 포함하세요.
+Plan today's schedule with 5-8 main activities.
+Each activity should include a time range and estimated duration.
 
-JSON 형식으로 응답:
-{{"summary": "<하루 요약>", "items": [{{"description": "<활동>", "time_range": "<HH:MM-HH:MM>", "duration_minutes": <분>}}]}}"""
+Respond in JSON:
+{{"summary": "<day summary>", "items": [{{"description": "<activity>", "time_range": "<HH:MM-HH:MM>", "duration_minutes": <minutes>}}]}}"""
 
 _DECOMPOSE_PROMPT = """\
-다음 활동을 {granularity}분 단위의 세부 행동으로 분해하세요.
+Break down the following activity into sub-actions at {granularity}-minute granularity.
 
-활동: {description}
-시간: {time_range}
+Activity: {description}
+Time: {time_range}
 
-JSON 형식으로 응답:
-{{"sub_items": [{{"description": "<세부 행동>", "duration_minutes": <분>}}]}}"""
+Respond in JSON:
+{{"sub_items": [{{"description": "<sub-action>", "duration_minutes": <minutes>}}]}}"""
 
 _REPLAN_PROMPT = """\
-당신은 {name}입니다.
+You are {name}.
 
-현재 계획:
+Current plan:
 {current_plan}
 
-새로운 상황: {observation}
+New situation: {observation}
 
-이 상황을 반영하여 남은 계획을 수정하세요.
+Revise the remaining plan to reflect this new situation.
 
-JSON 형식으로 응답:
-{{"summary": "<수정된 요약>", "items": [{{"description": "<활동>", "time_range": "<HH:MM-HH:MM>", "duration_minutes": <분>, "status": "<pending|done>"}}]}}"""
+Respond in JSON:
+{{"summary": "<revised summary>", "items": [{{"description": "<activity>", "time_range": "<HH:MM-HH:MM>", "duration_minutes": <minutes>, "status": "<pending|done>"}}]}}"""
 
 
 class Planner:
@@ -77,12 +77,12 @@ class Planner:
 
         try:
             data = await self._llm.generate_json(
-                system_prompt="당신은 일정을 계획하는 도우미입니다.",
+                system_prompt="You are a helper that plans schedules.",
                 user_prompt=_DAILY_PLAN_PROMPT.format(
                     name=self._persona.name,
                     persona_context=persona_context,
                     date=date,
-                    context=full_context or "특별한 상황 없음",
+                    context=full_context or "No special context",
                 ),
             )
 
@@ -111,7 +111,7 @@ class Planner:
         """계획 항목을 세부 행동으로 분해."""
         try:
             data = await self._llm.generate_json(
-                system_prompt="당신은 활동을 세부 단계로 분해하는 도우미입니다.",
+                system_prompt="You are a helper that breaks down activities into sub-steps.",
                 user_prompt=_DECOMPOSE_PROMPT.format(
                     description=item.description,
                     time_range=item.time_range or f"{item.duration_minutes}분",
@@ -144,7 +144,7 @@ class Planner:
 
         try:
             data = await self._llm.generate_json(
-                system_prompt="당신은 일정을 조정하는 도우미입니다.",
+                system_prompt="You are a helper that adjusts schedules.",
                 user_prompt=_REPLAN_PROMPT.format(
                     name=self._persona.name,
                     current_plan=plan_text,

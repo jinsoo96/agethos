@@ -17,24 +17,24 @@ from agethos.memory.stream import MemoryStream
 from agethos.models import MemoryNode, NodeType
 
 _FOCAL_PROMPT = """\
-다음은 최근 경험들입니다:
+Here are recent experiences:
 
 {memories}
 
-이 경험들을 바탕으로 가장 중요하고 깊이 생각해볼 만한 질문 {n}개를 생성하세요.
+Based on these experiences, generate {n} questions that are most important and worth deep reflection.
 
-JSON 형식으로 응답: {{"questions": ["질문1", "질문2", "질문3"]}}"""
+Respond in JSON: {{"questions": ["question1", "question2", "question3"]}}"""
 
 _INSIGHT_PROMPT = """\
-다음 질문에 대해, 관련 기억들을 바탕으로 통찰을 도출하세요.
+Given the following question, derive an insight based on the related memories.
 
-질문: {question}
+Question: {question}
 
-관련 기억:
+Related memories:
 {memories}
 
-다음 JSON 형식으로 응답:
-{{"insight": "<통찰 내용>", "evidence_indices": [<근거 기억 인덱스들>]}}"""
+Respond in JSON:
+{{"insight": "<insight content>", "evidence_indices": [<evidence memory indices>]}}"""
 
 
 class Reflector:
@@ -89,7 +89,7 @@ class Reflector:
 
             try:
                 data = await self._llm.generate_json(
-                    system_prompt="당신은 경험을 분석하고 통찰을 도출하는 도우미입니다.",
+                    system_prompt="You are a helper that analyzes experiences and derives insights.",
                     user_prompt=_INSIGHT_PROMPT.format(
                         question=question,
                         memories=memory_text,
@@ -134,7 +134,7 @@ class Reflector:
 
         try:
             data = await self._llm.generate_json(
-                system_prompt="당신은 경험을 분석하는 도우미입니다.",
+                system_prompt="You are a helper that analyzes experiences.",
                 user_prompt=_FOCAL_PROMPT.format(memories=memory_text, n=n),
             )
             return data.get("questions", [])[:n]

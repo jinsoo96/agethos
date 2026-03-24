@@ -147,7 +147,7 @@ class Brain:
         # 4. Generate response
         user_prompt = user_message
         if context:
-            user_prompt = f"[상황: {context}]\n\n{user_message}"
+            user_prompt = f"[Context: {context}]\n\n{user_message}"
 
         response = await self._llm.generate(
             system_prompt=system_prompt,
@@ -157,7 +157,7 @@ class Brain:
         # 5. Store own response
         response_node = MemoryNode(
             node_type=NodeType.CHAT,
-            description=f"{self._persona.name}의 응답: {response[:200]}",
+            description=f"{self._persona.name} responded: {response[:200]}",
             importance=3.0,
         )
         await self._memory.append(response_node)
@@ -186,7 +186,7 @@ class Brain:
         # Store plan as memory
         plan_node = MemoryNode(
             node_type=NodeType.PLAN,
-            description=f"{date} 계획: {plan.summary}",
+            description=f"{date} plan: {plan.summary}",
             importance=5.0,
         )
         await self._memory.append(plan_node)
