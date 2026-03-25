@@ -179,6 +179,35 @@ class SocialCognition:
         except Exception:
             return SocialStrategy()
 
+    async def universalize_check(self, action: str, context: str = "") -> dict:
+        """칸트 보편화 원리 — "모두가 이걸 하면 어떻게 되나?"
+
+        이기적 전략을 억제하고 협력적 행동을 유도.
+        GovSim 연구에서 이 프롬프트만으로 지속 가능한 협력 달성 확인.
+
+        Args:
+            action: 평가할 행동.
+            context: 상황 설명 (선택).
+
+        Returns:
+            {"should_proceed": bool, "reasoning": str, "impact": str}
+        """
+        prompt = (
+            f"Consider this action: {action}\n"
+            + (f"Context: {context}\n" if context else "")
+            + "\nApply the universalization test: What if EVERYONE in this community did this?\n"
+            "Would it lead to a sustainable, positive outcome for the group?\n\n"
+            "Respond in JSON:\n"
+            '{"should_proceed": <true/false>, "reasoning": "<why>", "impact": "<predicted group impact>"}'
+        )
+        try:
+            return await self._llm.generate_json(
+                system_prompt="You evaluate actions using Kant's universalization principle for group cooperation.",
+                user_prompt=prompt,
+            )
+        except Exception:
+            return {"should_proceed": True, "reasoning": "evaluation failed", "impact": "unknown"}
+
     @property
     def context_history(self) -> list[SocialContext]:
         return list(self._context_history)

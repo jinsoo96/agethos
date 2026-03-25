@@ -21,10 +21,12 @@ from agethos.models import (
     CommunityProfile,
     DailyPlan,
     EmotionalState,
+    MentalModel,
     MemoryNode,
     NodeType,
     PersonaSpec,
     RetrievalResult,
+    SelfRefineConfig,
     SocialPattern,
 )
 from agethos.persona.renderer import PersonaRenderer
@@ -75,6 +77,7 @@ class Brain:
         retrieval_weights: tuple[float, float, float] = (1.0, 1.0, 1.0),
         decay_factor: float = 0.995,
         max_history: int = 20,
+        self_refine: SelfRefineConfig | None = None,
     ):
         self._persona = persona
         self._llm = llm
@@ -107,6 +110,12 @@ class Brain:
         # Social learning state
         self._social_patterns: list[SocialPattern] = []
         self._community_profiles: list[CommunityProfile] = []
+
+        # Theory of Mind
+        self._mental_models: dict[str, MentalModel] = {}
+
+        # Self-Refine
+        self._self_refine_config = self_refine or SelfRefineConfig()
 
         # Seed memories
         self._seed_loaded = False
@@ -240,6 +249,13 @@ class Brain:
             user_prompt=user_prompt,
         )
 
+        # 4.5. Self-Refine (optional)
+        if self._self_refine_config.enabled:
+            from agethos.cognition.refine import SelfRefiner
+            refiner = SelfRefiner(llm=self._llm, config=self._self_refine_config)
+            result = await refiner.refine(response, user_message, self._renderer.render_iss())
+            response = result.refined
+
         # 5. Update conversation history
         self._history.append({"role": "user", "content": user_prompt})
         self._history.append({"role": "assistant", "content": response})
@@ -353,7 +369,7 @@ class Brain:
         all_memories = await self._memory.store.get_all()
 
         state = BrainState(
-            version="0.4.0",
+            version="0.5.0",
             last_active=time.time(),
             total_interactions=len([h for h in self._history if h.get("role") == "user"]),
             persona=self._persona,
@@ -361,6 +377,7 @@ class Brain:
             social_patterns=list(self._social_patterns),
             community_profiles=list(self._community_profiles),
             history=list(self._history),
+            mental_models=list(self._mental_models.values()),
         )
 
         data = state.model_dump(mode="json")
@@ -404,6 +421,10 @@ class Brain:
         # Restore social patterns & community profiles
         brain._social_patterns = list(state.social_patterns)
         brain._community_profiles = list(state.community_profiles)
+
+        # Restore mental models
+        for mm in state.mental_models:
+            brain._mental_models[mm.target] = mm
 
         # Restore history
         brain._history = list(state.history)
@@ -478,6 +499,33 @@ class Brain:
                 )
 
         return patterns
+
+    # ── Theory of Mind ──
+
+    async def infer_mental_model(self, target: str, conversation: str) -> MentalModel:
+        """대화에서 상대의 멘탈 모델 추론 또는 갱신.
+
+        이미 모델이 있으면 업데이트, 없으면 새로 생성.
+        """
+        from agethos.cognition.tom import TheoryOfMind
+        tom = TheoryOfMind(self._llm)
+
+        existing = self._mental_models.get(target)
+        if existing:
+            model = await tom.update(existing, conversation)
+        else:
+            model = await tom.infer(target, conversation)
+
+        self._mental_models[target] = model
+        return model
+
+    def get_mental_model(self, target: str) -> MentalModel | None:
+        """저장된 멘탈 모델 조회."""
+        return self._mental_models.get(target)
+
+    @property
+    def mental_models(self) -> dict[str, MentalModel]:
+        return dict(self._mental_models)
 
     # ── 상태 접근 (social) ──
 

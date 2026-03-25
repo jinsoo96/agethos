@@ -759,3 +759,72 @@ class BrainState(BaseModel):
 
     # 대화 기록
     history: list[dict[str, str]] = Field(default_factory=list)
+
+    # 상대 멘탈 모델 (ToM)
+    mental_models: list[MentalModel] = Field(default_factory=list)
+
+
+# ────────────────────────── Theory of Mind ──────────────────────────
+
+
+class MentalModel(BaseModel):
+    """상대방에 대한 에이전트의 내부 모델 (Theory of Mind).
+
+    대화 중 상대의 믿음, 의도, 감정 상태를 추론하여 기록.
+    대화할 때 "상대가 이걸 모를 수 있다" → 설명 추가 등에 활용.
+    """
+
+    target: str                                     # 누구에 대한 모델인지
+    believed_goals: list[str] = Field(default_factory=list)  # 상대가 뭘 원하는지
+    believed_knowledge: list[str] = Field(default_factory=list)  # 상대가 뭘 알고 있는지
+    believed_emotion: str = "neutral"               # 상대의 감정 추론
+    relationship_summary: str = ""                  # 관계 요약
+    confidence: float = 0.5                         # 추론 확신도
+    last_updated: float = Field(default_factory=time.time)
+
+
+# ────────────────────────── Self-Refine ──────────────────────────
+
+
+class SelfRefineConfig(BaseModel):
+    """Self-Refine 루프 설정.
+
+    생성 → 자기 평가 → 수정 사이클로 응답 품질 향상.
+    """
+
+    enabled: bool = False
+    max_iterations: int = 2
+    quality_threshold: float = 0.7
+    evaluate_axes: list[str] = Field(
+        default_factory=lambda: ["persona_consistency", "social_appropriateness", "helpfulness"]
+    )
+
+
+class SelfRefineResult(BaseModel):
+    """Self-Refine 실행 결과."""
+
+    original: str
+    refined: str
+    iterations: int = 0
+    scores: list[dict[str, float]] = Field(default_factory=list)
+
+
+# ────────────────────────── Multi-Agent Collaboration ──────────────────────────
+
+
+class CollaborationMessage(BaseModel):
+    """멀티에이전트 토론의 단일 발언."""
+
+    agent_name: str
+    content: str
+    round: int = 0
+    timestamp: float = Field(default_factory=time.time)
+
+
+class CollaborationResult(BaseModel):
+    """멀티에이전트 토론 결과."""
+
+    topic: str
+    messages: list[CollaborationMessage] = Field(default_factory=list)
+    consensus: str = ""
+    total_rounds: int = 0

@@ -571,6 +571,98 @@ env = ChatLogEnvironment.from_list([
 # Flexible key names: sender/author/user, content/text/message
 ```
 
+### Theory of Mind — Understanding Others
+
+Agents build mental models of people they interact with, tracking their goals, knowledge, and emotions:
+
+```python
+# Infer what the other person is thinking
+model = await brain.infer_mental_model("alice", conversation_text)
+print(model.believed_goals)     # ["wants to fix the bug", "needs help with testing"]
+print(model.believed_emotion)   # "frustrated"
+print(model.believed_knowledge) # ["knows Python", "doesn't know the new API"]
+
+# Model auto-updates on new conversations
+model = await brain.infer_mental_model("alice", new_conversation)
+
+# Access stored models
+brain.mental_models  # {"alice": MentalModel(...), "bob": MentalModel(...)}
+```
+
+### Self-Refine — Better Responses Through Self-Evaluation
+
+Enable automatic response improvement: generate → evaluate → refine cycle:
+
+```python
+from agethos import Brain, SelfRefineConfig
+
+brain = Brain.build(
+    persona={"name": "Minsoo", "ocean": {"O": 0.8, "C": 0.9}},
+    llm="openai",
+    self_refine=SelfRefineConfig(
+        enabled=True,
+        max_iterations=2,
+        quality_threshold=0.8,
+        evaluate_axes=["persona_consistency", "social_appropriateness", "helpfulness"],
+    ),
+)
+
+# brain.chat() now auto-refines responses
+reply = await brain.chat("Explain quantum computing")
+# Response is evaluated and refined if below quality threshold
+```
+
+### Multi-Agent Collaboration — Team Discussions
+
+Multiple Brain instances discuss topics using different protocols:
+
+```python
+from agethos.cognition.collaborate import team_discuss
+
+agents = {
+    "PM": Brain.build(
+        persona={"name": "Sara", "ocean": {"E": 0.8, "A": 0.7}},
+        llm="openai",
+    ),
+    "Engineer": Brain.build(
+        persona={"name": "Jin", "ocean": {"C": 0.9, "E": 0.2}},
+        llm="openai",
+    ),
+    "Designer": Brain.build(
+        persona={"name": "Mika", "ocean": {"O": 0.9, "A": 0.8}},
+        llm="openai",
+    ),
+}
+
+# Round-robin discussion
+result = await team_discuss(agents, "Should we rewrite the auth system?", protocol="round_robin")
+
+# Debate (pro/con split)
+result = await team_discuss(agents, "Microservices vs monolith?", protocol="debate")
+
+# Hierarchical (first agent = leader)
+result = await team_discuss(agents, "Q4 priorities?", protocol="hierarchical")
+
+print(result.consensus)  # Team's synthesized conclusion
+for msg in result.messages:
+    print(f"[Round {msg.round}] {msg.agent_name}: {msg.content}")
+```
+
+### Universalization Check — Cooperative Behavior
+
+Kant's universalization principle: "What if everyone did this?" Promotes cooperative strategies:
+
+```python
+from agethos.cognition.social import SocialCognition
+
+social = SocialCognition(llm=llm, name="Minsoo", ocean=ocean)
+result = await social.universalize_check(
+    action="Skip code review to ship faster",
+    context="Team under deadline pressure",
+)
+# {"should_proceed": false, "reasoning": "If everyone skipped reviews...", "impact": "..."}
+```
+
 ---
 
 ## Architecture
@@ -661,10 +753,12 @@ Every `brain.chat()` call:
 | `Brain.load(path, llm)` | Restore brain from saved state |
 | `brain.export(format)` | Export to platform format (anthropic, openai, crewai, etc.) |
 | `brain.observe_community(env)` | Vicarious learning — observe chats, extract patterns |
-| `brain.social_patterns` | Learned social patterns from observation |
-| `brain.community_profiles` | Per-community norm profiles |
+| `brain.infer_mental_model(target, text)` | Theory of Mind — infer other's goals/knowledge/emotion |
+| `brain.mental_models` | Stored mental models of others |
+| `team_discuss(agents, topic)` | Multi-agent team discussion (round_robin/debate/hierarchical) |
 | `social.read_context(text)` | Read social dynamics from conversation |
 | `social.decide_strategy(text)` | Choose personality-driven social strategy |
+| `social.universalize_check(action)` | Kant's universalization test for cooperative behavior |
 | `PersonaSpec.random(**pins)` | Generate random persona, pin specific fields |
 | `OceanTraits.random(**pins)` | Generate random OCEAN, pin specific traits |
 | `PersonaSpec.from_dict(d)` | Create persona from dict (shorthand keys supported) |
@@ -686,6 +780,11 @@ Every `brain.chat()` call:
 | `BrainState` | Full serializable snapshot (persona + memories + patterns + history) |
 | `SocialPattern` | Learned social norm from vicarious observation |
 | `CommunityProfile` | Per-community behavioral norms and tone |
+| `MentalModel` | Theory of Mind — inferred goals, knowledge, emotion of others |
+| `SelfRefineConfig` | Self-Refine loop settings (axes, threshold, iterations) |
+| `SelfRefineResult` | Self-Refine execution result (original, refined, scores) |
+| `CollaborationMessage` | Single utterance in multi-agent discussion |
+| `CollaborationResult` | Full discussion result with consensus |
 
 ## Algorithms
 
@@ -714,9 +813,9 @@ Every `brain.chat()` call:
 - [Character Card V2 Spec](https://github.com/malfoyslastname/character-card-spec-v2) — Tavern Card standard
 - [A2A Protocol](https://a2a-protocol.org/) — Agent-to-Agent discovery and communication
 
-## Project Status (v0.4.0)
+## Project Status (v0.5.0)
 
-> **Phase: Persistence + Vicarious Learning — Published on [PyPI](https://pypi.org/project/agethos/)**
+> **Phase: Social Intelligence — Published on [PyPI](https://pypi.org/project/agethos/)**
 
 ### Implemented
 
@@ -736,6 +835,10 @@ Every `brain.chat()` call:
 | **Cognition: Dialogue** | Done | `cognition/dialogue.py` — OCEAN-driven conversation continuity (continue/redirect/disengage/initiate) |
 | **Cognition: Social** | Done | `cognition/social.py` — read context (atmosphere/tension/undercurrent), personality-driven social strategy |
 | **Cognition: Observer** | Done | `cognition/observer.py` — vicarious learning: observe → extract patterns → merge duplicates |
+| **Cognition: ToM** | Done | `cognition/tom.py` — Theory of Mind: infer/update mental models of others |
+| **Cognition: Self-Refine** | Done | `cognition/refine.py` — generate → evaluate → refine loop with configurable axes |
+| **Cognition: Collaborate** | Done | `cognition/collaborate.py` — multi-agent team_discuss (round_robin/debate/hierarchical) |
+| **Universalization** | Done | `cognition/social.py` — Kant's universalization check for cooperative behavior |
 | **Autopilot** | Done | `autopilot.py` — autonomous loop with step()/run(), personality-driven triggers |
 | **Environment** | Done | `environment.py` — Environment ABC + QueueEnvironment + ChatLogEnvironment (JSON/JSONL) |
 | **Persistence** | Done | `brain.py` — save/load full BrainState (.brain.json), JSON serialization |
@@ -753,14 +856,13 @@ Every `brain.chat()` call:
 
 | Item | Notes |
 |------|-------|
-| Persistent storage backend | SQLite, Redis — currently InMemory only (but BrainState JSON covers save/load) |
+| Persistent storage backend | SQLite, Redis — currently InMemory only (BrainState JSON covers save/load) |
 | Anthropic embedding adapter | Only OpenAI embeddings available |
 | Tavern Card V3 export | Import only, no export to card format |
 | L1 auto-evolution | SocialPatterns collected but not yet auto-merged into behavioral_rules |
-| Theory of Mind | MentalModel for reasoning about others' beliefs/intentions |
-| Self-Refine loop | Generate → self-evaluate → refine cycle for responses |
-| Multi-agent collaboration | Team discussion/consensus protocol |
 | MCP/A2A serving | Expose Brain as MCP tool or A2A agent |
+| Hebbian learning | Reinforce successful strategies, weaken failed ones |
+| Memory consolidation | L0→L3 tier system for pattern lifecycle |
 | Plan-based proactive actions | Autopilot reacts to events but doesn't yet execute plans on schedule |
 
 ---
