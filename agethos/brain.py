@@ -319,10 +319,15 @@ class Brain:
         self,
         query: str,
         top_k: int = 10,
+        preset: str | None = None,
     ) -> list[RetrievalResult]:
-        """기억 검색."""
+        """기억 검색.
+
+        Args:
+            preset: 검색 프리셋 (recall, planning, reflection, observation, conversation, etc.)
+        """
         await self._ensure_seed()
-        return await self._retriever.retrieve(query, top_k=top_k)
+        return await self._retriever.retrieve(query, top_k=top_k, preset=preset)
 
     # ── 상태 접근 ──
 
@@ -526,6 +531,43 @@ class Brain:
     @property
     def mental_models(self) -> dict[str, MentalModel]:
         return dict(self._mental_models)
+
+    # ── Learning ──
+
+    def reinforce_pattern(self, pattern_id: str) -> SocialPattern | None:
+        """특정 패턴을 Hebbian 강화 (성공)."""
+        from agethos.learning.hebbian import HebbianEngine
+        engine = HebbianEngine()
+        for p in self._social_patterns:
+            if p.id == pattern_id:
+                return engine.reinforce(p)
+        return None
+
+    def weaken_pattern(self, pattern_id: str) -> SocialPattern | None:
+        """특정 패턴을 Hebbian 약화 (실패)."""
+        from agethos.learning.hebbian import HebbianEngine
+        engine = HebbianEngine()
+        for p in self._social_patterns:
+            if p.id == pattern_id:
+                return engine.weaken(p)
+        return None
+
+    def consolidate_patterns(self) -> dict[str, int]:
+        """메모리 통합 — 만료 패턴 제거, 단계별 요약 반환."""
+        from agethos.learning.consolidation import ConsolidationEngine
+        engine = ConsolidationEngine()
+        active, expired = engine.consolidate(self._social_patterns)
+        self._social_patterns = active
+        return engine.summary(active)
+
+    def evolve_persona(self, max_new_rules: int = 5) -> list[str]:
+        """L1 auto-evolution — 검증된 패턴을 behavioral_rules로 내면화."""
+        from agethos.learning.evolution import PersonaEvolver
+        evolver = PersonaEvolver()
+        new_rules = evolver.evolve(self._persona, self._social_patterns, max_new_rules)
+        if new_rules:
+            self._renderer = PersonaRenderer(self._persona)
+        return new_rules
 
     # ── 상태 접근 (social) ──
 

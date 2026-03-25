@@ -32,9 +32,11 @@ Agethos borrows the answer from **cognitive science, personality psychology, and
 |---|---|---|---|---|
 | **Personality model** | OCEAN (Big Five) numerical | ISS text only | role/goal/backstory | text traits |
 | **Emotional state** | PAD 3-axis, OCEAN-coupled | None | None | None |
-| **Memory + retrieval** | recency × importance × relevance | Same approach | None | None |
+| **Memory + retrieval** | recency × importance × relevance + intent presets | Same approach | None | None |
 | **Reflection** | Importance threshold → focal points → insights | Same approach | None | None |
-| **Persona evolution** | L2 dynamic + emotion drift | L2 daily update | Static | Static |
+| **Hebbian learning** | Asymmetric reinforce/weaken + adaptive rate | None | None | None |
+| **Memory consolidation** | L0→L3 tier lifecycle with promotion/demotion | None | None | None |
+| **Persona evolution** | L1 auto-evolution from learned patterns | L2 daily update | Static | Static |
 | **Character card formats** | W++, SBF, Tavern Card V2 | None | None | Native |
 | **Autopilot mode** | OCEAN-driven triggers + dialogue continuity | None | Task-based | None |
 | **Social cognition** | Context reading + personality-driven strategy | None | None | None |
@@ -663,6 +665,76 @@ result = await social.universalize_check(
 # {"should_proceed": false, "reasoning": "If everyone skipped reviews...", "impact": "..."}
 ```
 
+### Hebbian Learning — Reinforce What Works
+
+Patterns strengthen through success and weaken through failure, with asymmetric learning (failures teach more):
+
+```python
+# After observing that a strategy worked
+brain.reinforce_pattern(pattern_id)
+# → confidence += adaptive_delta(+0.1)
+
+# After observing that a strategy failed
+brain.weaken_pattern(pattern_id)
+# → confidence -= adaptive_delta(0.15)  ← asymmetric, failure > success
+
+# Mature patterns resist change (adaptive rate)
+# Young pattern (1 observation): Δ = 0.1 / (1 + 0.02×1) = 0.098
+# Mature pattern (50 observations): Δ = 0.1 / (1 + 0.02×50) = 0.050
+
+# Anti-resonance: confidence < 0 means "actively avoid this strategy"
+```
+
+### Memory Consolidation — Forget the Noise, Keep the Signal
+
+4-tier lifecycle for learned patterns, inspired by biological memory consolidation:
+
+```python
+# Consolidate — remove expired, promote/demote patterns
+summary = brain.consolidate_patterns()
+# → {"L0_RAW": 5, "L1_SPRINT": 3, "L2_MONTHLY": 1, "L3_PERMANENT": 1}
+```
+
+| Tier | TTL | Promotion | Description |
+|------|-----|-----------|-------------|
+| **L0 Raw** | 72 hours | Auto-created | Fresh observations, deleted if unaccessed |
+| **L1 Sprint** | 90 days | 3+ observations | Frequently confirmed patterns |
+| **L2 Monthly** | 365 days | 10+ observations | Important, well-validated patterns |
+| **L3 Permanent** | Forever | 80%+ confidence, 10+ obs | Core behavioral knowledge |
+
+L3 patterns get **demoted** if confidence drops below 60% — even permanent memories can fade if they stop being useful.
+
+### L1 Auto-Evolution — Internalize What You've Learned
+
+Automatically convert well-validated social patterns into permanent behavioral rules:
+
+```python
+# Auto-evolve: pattern → behavioral rule
+new_rules = brain.evolve_persona(max_new_rules=5)
+# → ["In Python Discord when code review: ask questions first (avoid: direct criticism)"]
+
+# Preview suggestions without applying
+from agethos.learning.evolution import PersonaEvolver
+evolver = PersonaEvolver()
+suggestions = evolver.suggest_rules(brain.social_patterns)
+# → [{"rule": "...", "source": "Python Discord", "confidence": "85%", "evidence": "8 observations"}]
+```
+
+### Intent-Aware Retrieval — Search Memories by Purpose
+
+Different retrieval weight presets for different cognitive tasks:
+
+```python
+# Recall: maximize relevance (weights: recency=0.5, importance=2.0, relevance=3.0)
+results = await brain.recall("quantum computing", preset="recall")
+
+# Planning: prioritize recent memories
+results = await brain.recall("today's tasks", preset="planning")
+
+# Available presets: default, recall, planning, reflection,
+#   observation, conversation, failure_analysis, exploration
+```
+
 ---
 
 ## Architecture
@@ -759,6 +831,10 @@ Every `brain.chat()` call:
 | `social.read_context(text)` | Read social dynamics from conversation |
 | `social.decide_strategy(text)` | Choose personality-driven social strategy |
 | `social.universalize_check(action)` | Kant's universalization test for cooperative behavior |
+| `brain.reinforce_pattern(id)` | Hebbian reinforcement — strengthen successful pattern |
+| `brain.weaken_pattern(id)` | Hebbian weakening — weaken failed pattern |
+| `brain.consolidate_patterns()` | Memory consolidation — expire/promote/demote patterns |
+| `brain.evolve_persona()` | L1 auto-evolution — internalize patterns as behavioral rules |
 | `PersonaSpec.random(**pins)` | Generate random persona, pin specific fields |
 | `OceanTraits.random(**pins)` | Generate random OCEAN, pin specific traits |
 | `PersonaSpec.from_dict(d)` | Create persona from dict (shorthand keys supported) |
@@ -813,9 +889,9 @@ Every `brain.chat()` call:
 - [Character Card V2 Spec](https://github.com/malfoyslastname/character-card-spec-v2) — Tavern Card standard
 - [A2A Protocol](https://a2a-protocol.org/) — Agent-to-Agent discovery and communication
 
-## Project Status (v0.5.0)
+## Project Status (v0.6.0)
 
-> **Phase: Social Intelligence — Published on [PyPI](https://pypi.org/project/agethos/)**
+> **Phase: Adaptive Learning — Published on [PyPI](https://pypi.org/project/agethos/)**
 
 ### Implemented
 
@@ -839,6 +915,10 @@ Every `brain.chat()` call:
 | **Cognition: Self-Refine** | Done | `cognition/refine.py` — generate → evaluate → refine loop with configurable axes |
 | **Cognition: Collaborate** | Done | `cognition/collaborate.py` — multi-agent team_discuss (round_robin/debate/hierarchical) |
 | **Universalization** | Done | `cognition/social.py` — Kant's universalization check for cooperative behavior |
+| **Hebbian Learning** | Done | `learning/hebbian.py` — asymmetric reinforce/weaken, adaptive rate, anti-resonance |
+| **Memory Consolidation** | Done | `learning/consolidation.py` — L0→L3 tier lifecycle, promotion/demotion |
+| **L1 Auto-Evolution** | Done | `learning/evolution.py` — validated patterns → behavioral_rules, L0 protection |
+| **Retrieval Presets** | Done | `cognition/retrieve.py` — 8 intent-aware weight presets (recall, planning, etc.) |
 | **Autopilot** | Done | `autopilot.py` — autonomous loop with step()/run(), personality-driven triggers |
 | **Environment** | Done | `environment.py` — Environment ABC + QueueEnvironment + ChatLogEnvironment (JSON/JSONL) |
 | **Persistence** | Done | `brain.py` — save/load full BrainState (.brain.json), JSON serialization |
@@ -859,10 +939,7 @@ Every `brain.chat()` call:
 | Persistent storage backend | SQLite, Redis — currently InMemory only (BrainState JSON covers save/load) |
 | Anthropic embedding adapter | Only OpenAI embeddings available |
 | Tavern Card V3 export | Import only, no export to card format |
-| L1 auto-evolution | SocialPatterns collected but not yet auto-merged into behavioral_rules |
 | MCP/A2A serving | Expose Brain as MCP tool or A2A agent |
-| Hebbian learning | Reinforce successful strategies, weaken failed ones |
-| Memory consolidation | L0→L3 tier system for pattern lifecycle |
 | Plan-based proactive actions | Autopilot reacts to events but doesn't yet execute plans on schedule |
 
 ---
