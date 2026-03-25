@@ -1,8 +1,8 @@
 <h1 align="center">Agethos</h1>
 
-<p align="center">A brain for AI agents — persona, memory, reflection, and planning in one library.</p>
+<p align="center">A brain for AI agents — persona, memory, reflection, planning, and social learning in one library.</p>
 
-<p align="center">Give any LLM agent a persistent identity with psychological grounding, long-term memory with retrieval scoring, dynamic emotional state, self-reflection, and daily planning.</p>
+<p align="center">Give any LLM agent a persistent identity with psychological grounding, long-term memory, dynamic emotional state, self-reflection, vicarious learning, and cross-platform export.</p>
 
 <p align="center">
   <a href="https://pypi.org/project/agethos/"><img src="https://img.shields.io/pypi/v/agethos.svg" alt="PyPI"></a>
@@ -38,6 +38,9 @@ Agethos borrows the answer from **cognitive science, personality psychology, and
 | **Character card formats** | W++, SBF, Tavern Card V2 | None | None | Native |
 | **Autopilot mode** | OCEAN-driven triggers + dialogue continuity | None | Task-based | None |
 | **Social cognition** | Context reading + personality-driven strategy | None | None | None |
+| **Vicarious learning** | Observe chats → extract social patterns → internalize | None | None | None |
+| **State persistence** | Save/load full brain state (.brain.json) | None | None | None |
+| **Cross-platform export** | Anthropic, OpenAI, CrewAI, Bedrock, A2A | None | None | None |
 | **LLM-agnostic** | OpenAI, Anthropic, custom (`base_url`) | OpenAI only | Various | N/A |
 
 ---
@@ -471,6 +474,103 @@ strategy = await social.decide_strategy(conversation_text, context)
 | Decisive leader (E=0.8, C=0.8, A=0.4) | ![](https://img.shields.io/badge/take__charge-red) | Issues directions, coordinates | Assertive, clear |
 | Quiet newcomer (E=0.1, A=0.9, N=0.8) | ![](https://img.shields.io/badge/empathize-green) | Acknowledges difficulty, offers support | Soft, deferential |
 
+### Save & Load — Persistent Brain State
+
+Save the full agent state (persona + memories + learned patterns + conversation history) and restore it later:
+
+```python
+brain = Brain.build(
+    persona={"name": "Minsoo", "ocean": {"O": 0.8, "C": 0.9, "E": 0.2}},
+    llm="openai",
+)
+
+# ... after many conversations and observations ...
+
+# Save everything
+await brain.save("minsoo.brain.json")
+
+# Later — restore with full history intact
+brain = await Brain.load("minsoo.brain.json", llm="openai")
+reply = await brain.chat("Remember what we discussed?")
+# Brain has all memories, emotions, and learned social patterns restored
+```
+
+### Export — Deploy Anywhere
+
+Export your trained personality to any platform. The `.brain` is the source of truth; exports are platform-specific translations:
+
+```python
+# Anthropic Messages API — use directly as system prompt
+system = brain.export("anthropic")
+# → client.messages.create(system=system, ...)
+
+# OpenAI Assistants API
+config = brain.export("openai_assistant")
+# → {"name": "Minsoo", "instructions": "...", "model": "gpt-4o"}
+
+# CrewAI agent config
+config = brain.export("crewai")
+# → {"role": "...", "goal": "...", "backstory": "..."}
+
+# AWS Bedrock Agent (4000 char limit auto-compressed)
+config = brain.export("bedrock_agent")
+# → {"agentName": "Minsoo", "instruction": "...(max 4000)"}
+
+# A2A Agent Card (service discovery)
+card = brain.export("a2a_card")
+# → {"name": "Minsoo", "description": "...", "skills": [...]}
+
+# Raw system prompt (copy-paste anywhere)
+prompt = brain.export("system_prompt")
+```
+
+### Vicarious Learning — Learn by Observing
+
+Agents observe external conversations without participating, extract social patterns, and internalize them:
+
+```python
+from agethos import Brain, ChatLogEnvironment
+
+brain = Brain.build(
+    persona={"name": "Minsoo", "ocean": {"O": 0.8, "C": 0.9, "E": 0.3}},
+    llm="openai",
+)
+
+# Observe a community's chat log
+env = ChatLogEnvironment.from_file("discord_log.json")
+patterns = await brain.observe_community(env, community_name="Python Discord")
+
+# What did the agent learn?
+for p in patterns:
+    print(f"[{p.community}] {p.context}")
+    print(f"  → Effective: {p.effective_strategy}")
+    if p.counterexample:
+        print(f"  → Avoid: {p.counterexample}")
+    print(f"  → Confidence: {p.confidence:.0%}")
+
+# Learned patterns automatically enrich future responses
+# When exported, patterns appear as "Learned Social Patterns" in the system prompt
+```
+
+**Supported chat log formats:**
+
+```python
+# JSON array
+env = ChatLogEnvironment.from_file("chat.json")
+# [{"sender": "alice", "content": "hello"}, ...]
+
+# JSONL (one message per line)
+env = ChatLogEnvironment.from_file("chat.jsonl")
+
+# Direct from Python
+env = ChatLogEnvironment.from_list([
+    {"sender": "alice", "content": "How do I fix this bug?"},
+    {"sender": "bob", "content": "Have you tried checking the logs?"},
+])
+
+# Flexible key names: sender/author/user, content/text/message
+```
+
 ---
 
 ## Architecture
@@ -478,6 +578,8 @@ strategy = await social.decide_strategy(conversation_text, context)
     Autopilot (autonomous loop)
       │
       ├── Environment ─────── poll() events, execute() actions
+      │     ├── QueueEnvironment ─── in-memory queue (testing)
+      │     └── ChatLogEnvironment ── static chat logs (JSON/JSONL)
       ├── EmotionDetector ─── text → PAD (auto)
       ├── DialogueManager ─── conversation continuity (OCEAN-driven)
       ├── SocialCognition ─── read the room → personality-driven strategy
@@ -498,7 +600,16 @@ strategy = await social.decide_strategy(conversation_text, context)
             │     ├── Retriever ──── Query memory with composite scoring
             │     ├── Reflector ──── Importance > 150 → focal points → insights
             │     ├── Planner ────── Recursive plan decomposition
-            │     └── SocialCog ─── Read context → personality strategy
+            │     ├── SocialCog ─── Read context → personality strategy
+            │     └── Observer ──── Vicarious learning: observe → extract → merge
+            │
+            ├── Persistence
+            │     ├── BrainState ─── Full state snapshot (save/load)
+            │     └── Export ─────── Adapters: anthropic, openai, crewai, bedrock, a2a
+            │
+            ├── Social Learning
+            │     ├── SocialPattern ──── Learned behavioral norms
+            │     └── CommunityProfile ─ Per-community norm profiles
             │
             ├── Character Cards ──── W++ / SBF / Tavern Card V2 → PersonaSpec
             │
@@ -546,6 +657,12 @@ Every `brain.chat()` call:
 | `pilot.step()` | Execute one tick of autonomous loop |
 | `pilot.run()` | Run autonomous loop until `stop()` |
 | `pilot.dialogue_state` | Current dialogue tracking state |
+| `brain.save(path)` | Save full brain state (persona + memories + patterns) |
+| `Brain.load(path, llm)` | Restore brain from saved state |
+| `brain.export(format)` | Export to platform format (anthropic, openai, crewai, etc.) |
+| `brain.observe_community(env)` | Vicarious learning — observe chats, extract patterns |
+| `brain.social_patterns` | Learned social patterns from observation |
+| `brain.community_profiles` | Per-community norm profiles |
 | `social.read_context(text)` | Read social dynamics from conversation |
 | `social.decide_strategy(text)` | Choose personality-driven social strategy |
 | `PersonaSpec.random(**pins)` | Generate random persona, pin specific fields |
@@ -566,6 +683,9 @@ Every `brain.chat()` call:
 | `RetrievalResult` | Node + score breakdown (recency, importance, relevance) |
 | `EnvironmentEvent` | Event from environment (message, observation, custom) |
 | `Action` | Agent action output (speak, act, silent) |
+| `BrainState` | Full serializable snapshot (persona + memories + patterns + history) |
+| `SocialPattern` | Learned social norm from vicarious observation |
+| `CommunityProfile` | Per-community behavioral norms and tone |
 
 ## Algorithms
 
@@ -585,24 +705,25 @@ Every `brain.chat()` call:
 ## References
 
 - [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442) — Memory stream, reflection, planning
+- [Agentic LLMs Survey](https://arxiv.org/abs/2503.23037) — Human-agent cooperation, ToM, social norms
 - [Mehrabian PAD Model (1996)](https://en.wikipedia.org/wiki/PAD_emotional_state_model) — Pleasure-Arousal-Dominance emotional space
 - [Big Five / OCEAN](https://en.wikipedia.org/wiki/Big_Five_personality_traits) — Five-factor personality model
 - [BIG5-CHAT (2024)](https://openreview.net/pdf?id=TqwTzLjzGS) — Big Five personality in LLM conversations
-- [Machine Mindset (MBTI)](https://arxiv.org/html/2312.12999v3) — MBTI-based LLM personality tuning
-- [JPAF: Evolving Personality](https://github.com/agent-topia/evolving_personality) — Jung function weights for dynamic personality
-- [Character Card V2 Spec](https://github.com/malfoyslastname/character-card-spec-v2) — Tavern Card standard
+- [Synaptic Memory](https://github.com/PlateerLab/synaptic-memory) — Hebbian learning, memory consolidation
 - [Leaked System Prompts](https://github.com/jujumilk3/leaked-system-prompts) — Real-world persona patterns
+- [Character Card V2 Spec](https://github.com/malfoyslastname/character-card-spec-v2) — Tavern Card standard
+- [A2A Protocol](https://a2a-protocol.org/) — Agent-to-Agent discovery and communication
 
-## Project Status (v0.3.0)
+## Project Status (v0.4.0)
 
-> **Phase: Social Cognition — Published on [PyPI](https://pypi.org/project/agethos/)**
+> **Phase: Persistence + Vicarious Learning — Published on [PyPI](https://pypi.org/project/agethos/)**
 
 ### Implemented
 
 | Module | Status | Files |
 |--------|--------|-------|
-| **Data Models** | Done | `models.py` — OceanTraits, EmotionalState, PersonaSpec, PersonaLayer, CharacterCard, MemoryNode, PlanItem, DailyPlan, RetrievalResult, EnvironmentEvent, Action |
-| **Brain Facade** | Done | `brain.py` — chat, observe, plan_day, reflect, recall, emotion control, autopilot |
+| **Data Models** | Done | `models.py` — OceanTraits, EmotionalState, PersonaSpec, PersonaLayer, CharacterCard, MemoryNode, PlanItem, DailyPlan, RetrievalResult, EnvironmentEvent, Action, BrainState, SocialPattern, CommunityProfile |
+| **Brain Facade** | Done | `brain.py` — chat, observe, plan_day, reflect, recall, emotion control, autopilot, save/load, export, observe_community |
 | **Persona Renderer** | Done | `persona/renderer.py` — ISS + OCEAN + emotion + memories + plan → system prompt |
 | **Memory Stream** | Done | `memory/stream.py` — append, retrieve (composite scoring), get_recent, importance tracking |
 | **Retrieval Scoring** | Done | `memory/retrieval.py` — recency × importance × relevance, min-max normalization, cosine similarity |
@@ -613,9 +734,12 @@ Every `brain.chat()` call:
 | **Cognition: Plan** | Done | `cognition/plan.py` — daily plan, recursive decompose, replan on new observations |
 | **Cognition: Emotion** | Done | `cognition/emotion.py` — text → PAD auto-detection via LLM |
 | **Cognition: Dialogue** | Done | `cognition/dialogue.py` — OCEAN-driven conversation continuity (continue/redirect/disengage/initiate) |
-| **Cognition: Social** | Done | `cognition/social.py` — read context (atmosphere/tension/undercurrent), personality-driven social strategy (agree/empathize/challenge/take_charge/etc.) |
+| **Cognition: Social** | Done | `cognition/social.py` — read context (atmosphere/tension/undercurrent), personality-driven social strategy |
+| **Cognition: Observer** | Done | `cognition/observer.py` — vicarious learning: observe → extract patterns → merge duplicates |
 | **Autopilot** | Done | `autopilot.py` — autonomous loop with step()/run(), personality-driven triggers |
-| **Environment** | Done | `environment.py` — Environment ABC + QueueEnvironment |
+| **Environment** | Done | `environment.py` — Environment ABC + QueueEnvironment + ChatLogEnvironment (JSON/JSONL) |
+| **Persistence** | Done | `brain.py` — save/load full BrainState (.brain.json), JSON serialization |
+| **Export Adapters** | Done | `export/adapters.py` — system_prompt, anthropic, openai_assistant, crewai, bedrock_agent, a2a_card |
 | **LLM Adapters** | Done | `llm/openai.py` (OpenAI + compatible via `base_url`), `llm/anthropic.py` (Anthropic Claude) |
 | **Embedding Adapter** | Done | `embedding/openai.py` (text-embedding-3-small/large/ada-002) |
 | **Character Cards** | Done | `models.py` — W++ parser, SBF parser, Tavern Card V2 → PersonaSpec conversion |
@@ -629,10 +753,14 @@ Every `brain.chat()` call:
 
 | Item | Notes |
 |------|-------|
-| Persistent storage backend | SQLite, Redis, etc. — currently InMemory only |
+| Persistent storage backend | SQLite, Redis — currently InMemory only (but BrainState JSON covers save/load) |
 | Anthropic embedding adapter | Only OpenAI embeddings available |
-| Tavern Card V2 export | Import only, no export to card format |
-| L1/L2 persona auto-evolution | Layers exist but no automatic update logic from interactions |
+| Tavern Card V3 export | Import only, no export to card format |
+| L1 auto-evolution | SocialPatterns collected but not yet auto-merged into behavioral_rules |
+| Theory of Mind | MentalModel for reasoning about others' beliefs/intentions |
+| Self-Refine loop | Generate → self-evaluate → refine cycle for responses |
+| Multi-agent collaboration | Team discussion/consensus protocol |
+| MCP/A2A serving | Expose Brain as MCP tool or A2A agent |
 | Plan-based proactive actions | Autopilot reacts to events but doesn't yet execute plans on schedule |
 
 ---
