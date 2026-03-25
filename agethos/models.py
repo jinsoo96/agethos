@@ -695,3 +695,67 @@ class Action(BaseModel):
     content: str = ""
     target: str = ""
     metadata: dict = Field(default_factory=dict)
+
+
+# ────────────────────────── Social Learning ──────────────────────────
+
+
+class SocialPattern(BaseModel):
+    """관찰 학습에서 추출된 사회적 패턴.
+
+    특정 커뮤니티/상황에서 효과적인(또는 비효과적인) 사회적 전략을 기록.
+    반복 관찰 시 evidence_count 증가, confidence 조정.
+    """
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    context: str                        # "기술 토론에서 반론 제시 시"
+    effective_strategy: str             # "질문 형태로 우회"
+    counterexample: str | None = None   # "직접 반박 시 분위기 경직"
+    evidence_count: int = 1             # 관찰 횟수
+    confidence: float = 0.5             # 0.0~1.0
+    community: str = ""                 # 출처 커뮤니티
+    created_at: float = Field(default_factory=time.time)
+
+
+class CommunityProfile(BaseModel):
+    """커뮤니티별 사회적 규범 프로필.
+
+    같은 OCEAN 성격이라도 장소에 따라 행동이 달라지는 것을 모델링.
+    에이전트가 해당 커뮨니티 진입 시 L2(Situation)에 로드.
+    """
+
+    name: str                                   # "Python Discord"
+    norms: list[SocialPattern] = Field(default_factory=list)
+    tone_baseline: str = ""                     # "casual-technical"
+    conflict_style: str = ""                    # "indirect-questioning"
+    observed_count: int = 0                     # 관찰한 대화 수
+    created_at: float = Field(default_factory=time.time)
+    last_updated: float = Field(default_factory=time.time)
+
+
+# ────────────────────────── Brain State ──────────────────────────
+
+
+class BrainState(BaseModel):
+    """인격체의 전체 상태 — 저장/복원 가능.
+
+    .brain.json 파일로 직렬화하여 인격의 설계도 + 경험 + 학습을 보존.
+    """
+
+    version: str = "0.4.0"
+    created_at: float = Field(default_factory=time.time)
+    last_active: float = Field(default_factory=time.time)
+    total_interactions: int = 0
+
+    # 정적 설계도
+    persona: PersonaSpec
+
+    # 축적된 경험
+    memories: list[MemoryNode] = Field(default_factory=list)
+
+    # 학습된 패턴
+    social_patterns: list[SocialPattern] = Field(default_factory=list)
+    community_profiles: list[CommunityProfile] = Field(default_factory=list)
+
+    # 대화 기록
+    history: list[dict[str, str]] = Field(default_factory=list)

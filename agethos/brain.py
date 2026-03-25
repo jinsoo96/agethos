@@ -5,6 +5,9 @@ Unifies persona, memory, and cognition as a single entry point.
 
 from __future__ import annotations
 
+import json
+import time
+
 from agethos.cognition.perceive import Perceiver
 from agethos.cognition.plan import Planner
 from agethos.cognition.reflect import Reflector
@@ -13,7 +16,17 @@ from agethos.embedding.base import EmbeddingAdapter
 from agethos.llm.base import LLMAdapter
 from agethos.memory.store import StorageBackend
 from agethos.memory.stream import MemoryStream
-from agethos.models import DailyPlan, EmotionalState, MemoryNode, NodeType, PersonaSpec, RetrievalResult
+from agethos.models import (
+    BrainState,
+    CommunityProfile,
+    DailyPlan,
+    EmotionalState,
+    MemoryNode,
+    NodeType,
+    PersonaSpec,
+    RetrievalResult,
+    SocialPattern,
+)
 from agethos.persona.renderer import PersonaRenderer
 from agethos.storage.memory_store import InMemoryStore
 
@@ -90,6 +103,10 @@ class Brain:
 
         # Init emotion from OCEAN if available
         self._persona.init_emotion_from_ocean()
+
+        # Social learning state
+        self._social_patterns: list[SocialPattern] = []
+        self._community_profiles: list[CommunityProfile] = []
 
         # Seed memories
         self._seed_loaded = False
@@ -325,6 +342,154 @@ class Brain:
     def decay_emotion(self, rate: float = 0.1) -> None:
         """감정 감쇠."""
         self._persona.decay_emotion(rate)
+
+    # ── 저장/복원 ──
+
+    async def save(self, path: str) -> None:
+        """인격 상태 전체를 .brain.json 파일로 저장.
+
+        PersonaSpec + 기억 + 학습 패턴 + 대화 기록을 직렬화.
+        """
+        all_memories = await self._memory.store.get_all()
+
+        state = BrainState(
+            version="0.4.0",
+            last_active=time.time(),
+            total_interactions=len([h for h in self._history if h.get("role") == "user"]),
+            persona=self._persona,
+            memories=all_memories,
+            social_patterns=list(self._social_patterns),
+            community_profiles=list(self._community_profiles),
+            history=list(self._history),
+        )
+
+        data = state.model_dump(mode="json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    @classmethod
+    async def load(
+        cls,
+        path: str,
+        llm: str | LLMAdapter,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        **kwargs,
+    ) -> Brain:
+        """저장된 .brain.json에서 Brain 복원.
+
+        경험/기억/학습 패턴이 그대로 복원됨.
+
+        Args:
+            path: .brain.json 파일 경로.
+            llm: LLM 프로바이더 또는 어댑터 인스턴스.
+            **kwargs: Brain.__init__에 전달.
+        """
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        state = BrainState.model_validate(data)
+
+        # Resolve LLM
+        if isinstance(llm, str):
+            llm = _resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
+
+        brain = cls(persona=state.persona, llm=llm, **kwargs)
+
+        # Restore memories
+        for mem in state.memories:
+            await brain._memory.store.save(mem)
+
+        # Restore social patterns & community profiles
+        brain._social_patterns = list(state.social_patterns)
+        brain._community_profiles = list(state.community_profiles)
+
+        # Restore history
+        brain._history = list(state.history)
+        brain._seed_loaded = True
+
+        return brain
+
+    # ── Export 어댑터 ──
+
+    def export(self, format: str, **kwargs) -> str | dict:
+        """인격을 다양한 플랫폼 형식으로 내보내기.
+
+        Args:
+            format: 출력 형식. 지원:
+                - "system_prompt": 범용 시스템 프롬프트 텍스트
+                - "anthropic": Anthropic Messages API system 필드용
+                - "openai_assistant": OpenAI Assistants API instructions
+                - "crewai": CrewAI agent config dict
+                - "bedrock_agent": AWS Bedrock instruction (4000자 제한)
+                - "a2a_card": A2A Agent Card dict
+
+        Returns:
+            str (프롬프트 형식) 또는 dict (API 설정 형식).
+        """
+        from agethos.export.adapters import export_brain
+        return export_brain(self, format, **kwargs)
+
+    # ── 관찰 학습 ──
+
+    async def observe_community(
+        self,
+        env,
+        max_messages: int = 500,
+        community_name: str = "",
+    ) -> list[SocialPattern]:
+        """외부 채팅을 관찰하여 사회적 패턴 추출.
+
+        Args:
+            env: Environment (ChatLogEnvironment 등).
+            max_messages: 최대 관찰 메시지 수.
+            community_name: 커뮤니티 이름.
+
+        Returns:
+            추출된 SocialPattern 목록.
+        """
+        from agethos.cognition.observer import Observer
+        observer = Observer(
+            brain=self,
+            llm=self._llm,
+            community_name=community_name,
+        )
+        patterns = await observer.observe(env, max_messages=max_messages)
+        self._social_patterns.extend(patterns)
+
+        # Update or create community profile
+        if community_name:
+            existing = next(
+                (cp for cp in self._community_profiles if cp.name == community_name),
+                None,
+            )
+            if existing:
+                existing.norms.extend(patterns)
+                existing.observed_count += max_messages
+                existing.last_updated = time.time()
+            else:
+                self._community_profiles.append(
+                    CommunityProfile(
+                        name=community_name,
+                        norms=patterns,
+                        observed_count=max_messages,
+                    )
+                )
+
+        return patterns
+
+    # ── 상태 접근 (social) ──
+
+    @property
+    def social_patterns(self) -> list[SocialPattern]:
+        return list(self._social_patterns)
+
+    @property
+    def community_profiles(self) -> list[CommunityProfile]:
+        return list(self._community_profiles)
+
+    # ── 기존 ──
 
     def autopilot(self, env, **kwargs):
         """이 Brain에 연결된 Autopilot 생성.
