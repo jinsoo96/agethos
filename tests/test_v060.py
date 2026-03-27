@@ -291,7 +291,7 @@ class TestRetrievalPresets:
     def test_preset_values_are_tuples(self):
         from agethos.cognition.retrieve import RETRIEVAL_PRESETS
         for name, weights in RETRIEVAL_PRESETS.items():
-            assert len(weights) == 3, f"{name} should have 3 weights"
+            assert len(weights) in (3, 5), f"{name} should have 3 or 5 weights"
             assert all(isinstance(w, (int, float)) for w in weights)
 
     def test_recall_favors_relevance(self):

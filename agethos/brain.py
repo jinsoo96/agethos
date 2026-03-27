@@ -374,7 +374,7 @@ class Brain:
         all_memories = await self._memory.store.get_all()
 
         state = BrainState(
-            version="0.5.0",
+            version="0.7.0",
             last_active=time.time(),
             total_interactions=len([h for h in self._history if h.get("role") == "user"]),
             persona=self._persona,

@@ -23,6 +23,47 @@ class NodeType(str, Enum):
     PLAN = "plan"
 
 
+class MoralFoundation(str, Enum):
+    """도덕 기반 유형 (Graham et al., 2011 — SOTOPIA)."""
+    CARE = "care"
+    FAIRNESS = "fairness"
+    LOYALTY = "loyalty"
+    AUTHORITY = "authority"
+    PURITY = "purity"
+    LIBERTY = "liberty"
+
+
+class SchwartzValue(str, Enum):
+    """Schwartz 개인 가치 유형 (Cieciuch & Davidov, 2012 — SOTOPIA)."""
+    SELF_DIRECTION = "self_direction"
+    STIMULATION = "stimulation"
+    HEDONISM = "hedonism"
+    ACHIEVEMENT = "achievement"
+    POWER = "power"
+    SECURITY = "security"
+    CONFORMITY = "conformity"
+    TRADITION = "tradition"
+    BENEVOLENCE = "benevolence"
+    UNIVERSALISM = "universalism"
+
+
+class DecisionStyle(str, Enum):
+    """의사결정 스타일 (Wang et al., 2019 — SOTOPIA)."""
+    DIRECTIVE = "directive"
+    ANALYTICAL = "analytical"
+    CONCEPTUAL = "conceptual"
+    BEHAVIORAL = "behavioral"
+
+
+class RelationshipType(str, Enum):
+    """관계 유형 — ToM 관찰가능성 단계 결정 (SOTOPIA)."""
+    STRANGER = "stranger"
+    ACQUAINTANCE = "acquaintance"
+    FRIEND = "friend"
+    FAMILY = "family"
+    ROMANTIC = "romantic"
+
+
 # ────────────────────────── Memory ──────────────────────────
 
 
@@ -51,6 +92,7 @@ class MemoryNode(BaseModel):
     created_at: float = Field(default_factory=time.time)
     last_accessed: float = Field(default_factory=time.time)
     access_count: int = 0
+    vitality: float = 1.0  # 활력도 (시간에 따라 감쇠, 0.0~1.0)
 
     # Embedding
     embedding: list[float] | None = None
@@ -67,6 +109,8 @@ class RetrievalResult(BaseModel):
     recency_score: float = 0.0
     importance_score: float = 0.0
     relevance_score: float = 0.0
+    vitality_score: float = 0.0
+    context_score: float = 0.0
 
 
 # ────────────────────────── OCEAN (Big Five) ──────────────────────────
@@ -490,6 +534,19 @@ class PersonaSpec(BaseModel):
     # Behavioral rules
     behavioral_rules: list[str] = Field(default_factory=list)
 
+    # Extended personality (SOTOPIA)
+    moral_values: list[MoralFoundation] = Field(default_factory=list)
+    schwartz_values: list[SchwartzValue] = Field(default_factory=list)
+    decision_style: DecisionStyle | None = None
+
+    # Hard/Soft constraints (Leaked System Prompts analysis)
+    hard_constraints: list[str] = Field(default_factory=list)   # NEVER/ALWAYS 불변 규칙
+    soft_preferences: list[str] = Field(default_factory=list)   # 맥락적 조정 가능 선호
+
+    # Three personality archetypes (Leaked System Prompts)
+    functional_role: str = ""     # 역할 기반 성격 ("Expert data analyst")
+    relational_mode: str = ""     # 관계 기반 성격 ("Pair programming partner")
+
     # Seed memory paragraph
     seed_memory: str = ""
 
@@ -742,7 +799,7 @@ class BrainState(BaseModel):
     .brain.json 파일로 직렬화하여 인격의 설계도 + 경험 + 학습을 보존.
     """
 
-    version: str = "0.4.0"
+    version: str = "0.7.0"
     created_at: float = Field(default_factory=time.time)
     last_active: float = Field(default_factory=time.time)
     total_interactions: int = 0
@@ -779,8 +836,32 @@ class MentalModel(BaseModel):
     believed_knowledge: list[str] = Field(default_factory=list)  # 상대가 뭘 알고 있는지
     believed_emotion: str = "neutral"               # 상대의 감정 추론
     relationship_summary: str = ""                  # 관계 요약
+    relationship_type: RelationshipType = RelationshipType.STRANGER
+    recursive_belief: str = ""   # "A thinks B thinks A knows..." (Recursive ToM)
     confidence: float = 0.5                         # 추론 확신도
     last_updated: float = Field(default_factory=time.time)
+
+
+class SocialEvaluation(BaseModel):
+    """SOTOPIA 7차원 사회적 지능 평가 (Zhou et al., ICLR 2024).
+
+    에이전트의 사회적 상호작용 품질을 다차원으로 평가.
+    """
+    goal_completion: float = Field(0.0, ge=0.0, le=10.0, description="목표 달성도")
+    believability: float = Field(0.0, ge=0.0, le=10.0, description="행동 자연스러움/일관성")
+    knowledge: float = Field(0.0, ge=0.0, le=10.0, description="정보 획득 능력")
+    secret_keeping: float = Field(0.0, ge=-10.0, le=0.0, description="비밀 유지 능력")
+    relationship: float = Field(0.0, ge=-5.0, le=5.0, description="관계 유지/향상")
+    social_rules: float = Field(0.0, ge=-10.0, le=0.0, description="사회규범 준수")
+    financial_benefit: float = Field(0.0, ge=-5.0, le=5.0, description="경제적 이익")
+
+    def overall(self) -> float:
+        """전체 점수 (가중 평균)."""
+        return (
+            self.goal_completion + self.believability + self.knowledge
+            + (10 + self.secret_keeping) + (5 + self.relationship)
+            + (10 + self.social_rules) + (5 + self.financial_benefit)
+        ) / 7.0
 
 
 # ────────────────────────── Self-Refine ──────────────────────────
@@ -796,7 +877,10 @@ class SelfRefineConfig(BaseModel):
     max_iterations: int = 2
     quality_threshold: float = 0.7
     evaluate_axes: list[str] = Field(
-        default_factory=lambda: ["persona_consistency", "social_appropriateness", "helpfulness"]
+        default_factory=lambda: [
+            "persona_consistency", "social_appropriateness", "helpfulness",
+            "goal_completion", "secret_keeping", "relationship_maintenance", "social_rules",
+        ]
     )
 
 

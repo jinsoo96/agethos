@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 
 from agethos.llm.base import LLMAdapter
-from agethos.models import MentalModel
+from agethos.models import MentalModel, RelationshipType
 
 _TOM_PROMPT = """\
 You are analyzing a conversation to build a mental model of "{target}".
@@ -52,6 +52,34 @@ Respond in JSON:
   "believed_knowledge": ["knows X", "doesn't seem to know Y"],
   "believed_emotion": "<emotion label>",
   "relationship_summary": "<brief summary>",
+  "confidence": <0.0 to 1.0>
+}}"""
+
+# Relationship → ToM inference depth (SOTOPIA)
+_RELATIONSHIP_DEPTH = {
+    RelationshipType.STRANGER: 1,      # 기본 추론만
+    RelationshipType.ACQUAINTANCE: 2,  # 목표 + 감정
+    RelationshipType.FRIEND: 3,        # 목표 + 감정 + 지식
+    RelationshipType.FAMILY: 4,        # 전체 + recursive
+    RelationshipType.ROMANTIC: 4,      # 전체 + recursive
+}
+
+_RECURSIVE_TOM_PROMPT = """\
+You are performing recursive Theory of Mind analysis.
+
+{name} is interacting with {target}.
+
+Current mental model of {target}:
+- Goals: {goals}
+- Knowledge: {knowledge}
+- Emotion: {emotion}
+
+Now infer: What does {target} think {name} is thinking/feeling/wanting?
+This is a second-order belief — {target}'s model of {name}.
+
+Respond in JSON:
+{{
+  "recursive_belief": "<what {target} likely thinks about {name}'s state>",
   "confidence": <0.0 to 1.0>
 }}"""
 
@@ -116,9 +144,34 @@ class TheoryOfMind:
         except Exception:
             return model
 
+    async def infer_recursive(
+        self,
+        name: str,
+        model: MentalModel,
+    ) -> str:
+        """2차 ToM — 상대가 나를 어떻게 보는지 추론 (Recursive ToM)."""
+        try:
+            data = await self._llm.generate_json(
+                system_prompt="You perform recursive Theory of Mind — modeling what others think about you.",
+                user_prompt=_RECURSIVE_TOM_PROMPT.format(
+                    name=name,
+                    target=model.target,
+                    goals=", ".join(model.believed_goals) or "unknown",
+                    knowledge=", ".join(model.believed_knowledge) or "unknown",
+                    emotion=model.believed_emotion,
+                ),
+            )
+            return data.get("recursive_belief", "")
+        except Exception:
+            return ""
+
+    def get_inference_depth(self, relationship: RelationshipType) -> int:
+        """관계 유형별 추론 깊이 반환."""
+        return _RELATIONSHIP_DEPTH.get(relationship, 1)
+
     def to_prompt(self, model: MentalModel) -> str:
         """멘탈 모델을 시스템 프롬프트에 주입 가능한 텍스트로 변환."""
-        parts = [f"Your understanding of {model.target}:"]
+        parts = [f"Your understanding of {model.target} (relationship: {model.relationship_type.value}):"]
         if model.believed_goals:
             parts.append(f"- Goals: {', '.join(model.believed_goals)}")
         if model.believed_knowledge:
@@ -126,5 +179,7 @@ class TheoryOfMind:
         parts.append(f"- Emotional state: {model.believed_emotion}")
         if model.relationship_summary:
             parts.append(f"- Relationship: {model.relationship_summary}")
+        if model.recursive_belief:
+            parts.append(f"- They likely think about you: {model.recursive_belief}")
         parts.append(f"- Confidence: {model.confidence:.0%}")
         return "\n".join(parts)

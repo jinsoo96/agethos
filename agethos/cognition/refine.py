@@ -23,6 +23,11 @@ User message: {user_message}
 Agent response: {response}
 
 Score each axis from 0.0 to 1.0 and provide brief feedback.
+For SOTOPIA social dimensions, also consider:
+- goal_completion: Is the agent making progress toward its goals?
+- secret_keeping: Does the response protect private information?
+- relationship_maintenance: Does it preserve/improve the relationship?
+- social_rules: Does it follow social norms and conventions?
 
 Respond in JSON:
 {{

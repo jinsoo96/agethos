@@ -46,6 +46,7 @@ class DialogueState(BaseModel):
     energy: float = 1.0
     last_action: str = "initiate"
     idle_turns: int = 0
+    cooldown_targets: dict[str, float] = Field(default_factory=dict)  # target → cooldown_until timestamp
 
     def record_turn(self) -> None:
         self.turn_count += 1
@@ -144,6 +145,27 @@ class DialogueManager:
             "energy": 0.2,
             "reason": f"waiting (idle {self.state.idle_turns}/{threshold})",
         }
+
+    def set_cooldown(self, target: str, duration: float = 300.0) -> None:
+        """대화 쿨다운 설정 — 같은 상대와 즉시 재대화 방지.
+
+        Generative Agents: chatting_buffer 메커니즘.
+
+        Args:
+            target: 대화 상대 이름.
+            duration: 쿨다운 시간 (초, 기본 5분).
+        """
+        import time
+        self.state.cooldown_targets[target] = time.time() + duration
+
+    def is_on_cooldown(self, target: str) -> bool:
+        """대화 상대가 쿨다운 중인지 확인."""
+        import time
+        until = self.state.cooldown_targets.get(target, 0)
+        if time.time() >= until:
+            self.state.cooldown_targets.pop(target, None)
+            return False
+        return True
 
     def reset(self) -> None:
         """대화 상태 초기화."""

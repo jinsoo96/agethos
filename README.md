@@ -30,16 +30,18 @@ Agethos borrows the answer from **cognitive science, personality psychology, and
 
 | | Agethos | Generative Agents | CrewAI | Character Cards |
 |---|---|---|---|---|
-| **Personality model** | OCEAN (Big Five) numerical | ISS text only | role/goal/backstory | text traits |
+| **Personality model** | OCEAN + Moral Values + Schwartz + Decision Style | ISS text only | role/goal/backstory | text traits |
 | **Emotional state** | PAD 3-axis, OCEAN-coupled | None | None | None |
-| **Memory + retrieval** | recency × importance × relevance + intent presets | Same approach | None | None |
+| **Memory + retrieval** | 5-axis scoring (recency × importance × relevance × vitality × context) | 3-axis | None | None |
 | **Reflection** | Importance threshold → focal points → insights | Same approach | None | None |
 | **Hebbian learning** | Asymmetric reinforce/weaken + adaptive rate | None | None | None |
 | **Memory consolidation** | L0→L3 tier lifecycle with promotion/demotion | None | None | None |
 | **Persona evolution** | L1 auto-evolution from learned patterns | L2 daily update | Static | Static |
 | **Character card formats** | W++, SBF, Tavern Card V2 | None | None | Native |
 | **Autopilot mode** | OCEAN-driven triggers + dialogue continuity | None | Task-based | None |
-| **Social cognition** | Context reading + personality-driven strategy | None | None | None |
+| **Social cognition** | Context reading + strategy + secret guard + SOTOPIA 7-dim eval | None | None | None |
+| **Theory of Mind** | Relationship-based depth + recursive ToM | None | None | None |
+| **Tree of Thoughts** | BFS branching for complex decisions | None | None | None |
 | **Vicarious learning** | Observe chats → extract social patterns → internalize | None | None | None |
 | **State persistence** | Save/load full brain state (.brain.json) | None | None | None |
 | **Cross-platform export** | Anthropic, OpenAI, CrewAI, Bedrock, A2A | None | None | None |
@@ -90,16 +92,21 @@ Three identity layers from Generative Agents + six persona facets from system pr
 
     + 6 Facets: identity, tone, values, boundaries, conversation_style, transparency
     + Behavioral Rules: "When X happens, do Y" (more effective than adjectives)
+    + Hard Constraints: NEVER/ALWAYS rules (immutable at runtime)
+    + Soft Preferences: context-adjustable tendencies
+    + 3 Persona Archetypes: trait-based + functional + relational
 
 ### 4. Memory Stream — Remember what matters
 
 Retrieval scoring from the Generative Agents paper:
 
-    Score = w_r × recency + w_i × importance + w_v × relevance
+    Score = w_r × recency + w_i × importance + w_v × relevance + w_vit × vitality + w_ctx × context
 
     recency:    0.995^(hours_since_access)
     importance: LLM-judged 1-10 per observation
     relevance:  cosine similarity (query embedding ↔ memory embedding)
+    vitality:   memory freshness (decays over time, 0.0~1.0)
+    context:    Jaccard-like keyword overlap with current session
 
     Reflection triggers when importance accumulates > 150:
       → 3 focal points → retrieve related memories → synthesize insights → store as depth=2+ nodes
@@ -605,7 +612,7 @@ brain = Brain.build(
         enabled=True,
         max_iterations=2,
         quality_threshold=0.8,
-        evaluate_axes=["persona_consistency", "social_appropriateness", "helpfulness"],
+        # SOTOPIA 7-dimension evaluation included by default
     ),
 )
 
@@ -731,8 +738,123 @@ results = await brain.recall("quantum computing", preset="recall")
 # Planning: prioritize recent memories
 results = await brain.recall("today's tasks", preset="planning")
 
-# Available presets: default, recall, planning, reflection,
+# 3-axis presets: default, recall, planning, reflection,
 #   observation, conversation, failure_analysis, exploration
+# 5-axis presets (v0.7.0): deep_recall, contextual, social, past_failures
+```
+
+### Extended Personality — SOTOPIA-style Rich Profiles (v0.7.0)
+
+Go beyond OCEAN with moral values, personal values, and decision styles:
+
+```python
+from agethos import PersonaSpec, MoralFoundation, SchwartzValue, DecisionStyle
+
+spec = PersonaSpec(
+    name="Dr. Kim",
+    ocean=OceanTraits(O=0.85, C=0.9, E=0.3, A=0.7, N=0.2),
+    # Moral foundations (Graham et al., 2011)
+    moral_values=[MoralFoundation.CARE, MoralFoundation.FAIRNESS],
+    # Schwartz personal values
+    schwartz_values=[SchwartzValue.BENEVOLENCE, SchwartzValue.SELF_DIRECTION],
+    # Decision-making style
+    decision_style=DecisionStyle.ANALYTICAL,
+    # Hard constraints — NEVER violated
+    hard_constraints=["NEVER fabricate data", "ALWAYS cite sources"],
+    # Soft preferences — context-adjustable
+    soft_preferences=["Prefer nuanced over binary answers"],
+    # Three personality archetypes
+    functional_role="AI safety researcher",          # what you DO
+    relational_mode="Academic mentor for juniors",   # how you RELATE
+)
+```
+
+### Secret Guard — Protect Private Information (v0.7.0)
+
+LLMs universally fail at keeping secrets (SOTOPIA finding). Explicit protection:
+
+```python
+result = await social.secret_guard(
+    response="Sure, the API key is sk-abc123...",
+    secrets=["API key is sk-abc123", "Budget is $50k"],
+)
+# {"is_safe": false, "leaked_secrets": ["API key"], "sanitized": "I can't share that."}
+```
+
+### Relationship-Based Theory of Mind (v0.7.0)
+
+ToM inference depth varies by relationship closeness (SOTOPIA):
+
+```python
+from agethos import RelationshipType
+
+model = await brain.infer_mental_model("alice", conversation)
+model.relationship_type = RelationshipType.FRIEND  # deeper inference
+# Stranger: basic goals only → Friend: goals + emotion + knowledge → Family: full + recursive
+
+# Recursive ToM: "What does Alice think I'm thinking?"
+from agethos.cognition.tom import TheoryOfMind
+tom = TheoryOfMind(llm)
+recursive = await tom.infer_recursive("me", model)
+# → "Alice thinks I want to help her with the project"
+```
+
+### Tree of Thoughts — Complex Decision Making (v0.7.0)
+
+BFS-based branching exploration for complex decisions:
+
+```python
+from agethos.cognition.tot import TreeOfThoughts
+
+tot = TreeOfThoughts(llm=llm)
+result = await tot.solve(
+    problem="Should I accept the job offer or negotiate?",
+    context="Current: 80k, Offer: 95k, Market: 110k",
+    n_branches=3,
+    max_depth=2,
+)
+print(result["conclusion"])   # synthesized recommendation
+print(result["confidence"])   # 0.85
+print(result["best_path"])    # reasoning chain
+```
+
+### SOTOPIA 7-Dimension Social Evaluation (v0.7.0)
+
+Evaluate agent social intelligence across 7 research-grounded dimensions:
+
+```python
+from agethos import SocialEvaluation
+
+eval = SocialEvaluation(
+    goal_completion=8.0,    # 0-10: achieved goals?
+    believability=7.0,      # 0-10: natural, consistent?
+    knowledge=6.0,          # 0-10: acquired info?
+    secret_keeping=-2.0,    # -10~0: kept secrets?
+    relationship=3.0,       # -5~5: preserved relationships?
+    social_rules=-1.0,      # -10~0: followed norms?
+    financial_benefit=2.0,  # -5~5: economic value?
+)
+print(eval.overall())  # weighted average score
+```
+
+### Conversation Cooldown (v0.7.0)
+
+Prevent agents from re-engaging the same partner immediately (Generative Agents pattern):
+
+```python
+# Autopilot automatically sets 5-min cooldown after each conversation
+# Manual control:
+dialogue_manager.set_cooldown("alice", duration=300.0)
+dialogue_manager.is_on_cooldown("alice")  # True
+```
+
+### Perception Bandwidth (v0.7.0)
+
+Limit cognitive load per tick (Generative Agents attention bandwidth):
+
+```python
+pilot = brain.autopilot(env, att_bandwidth=3)  # max 3 events per tick
+# Closest/most important events processed first
 ```
 
 ---
@@ -756,7 +878,7 @@ results = await brain.recall("today's tasks", preset="planning")
             │     └── EmotionalState  PAD 3-axis → closest emotion → prompt text
             │
             ├── MemoryStream ─────── Append, retrieve, importance tracking
-            │     ├── Retrieval ──── recency × importance × relevance scoring
+            │     ├── Retrieval ──── 5-axis scoring (recency × importance × relevance × vitality × context)
             │     └── StorageBackend (ABC) ── InMemoryStore / custom
             │
             ├── Cognition
@@ -764,8 +886,9 @@ results = await brain.recall("today's tasks", preset="planning")
             │     ├── Retriever ──── Query memory with composite scoring
             │     ├── Reflector ──── Importance > 150 → focal points → insights
             │     ├── Planner ────── Recursive plan decomposition
-            │     ├── SocialCog ─── Read context → personality strategy
-            │     └── Observer ──── Vicarious learning: observe → extract → merge
+            │     ├── SocialCog ─── Read context → personality strategy → secret guard
+            │     ├── Observer ──── Vicarious learning: observe → extract → merge
+            │     └── ToT ────────── Tree of Thoughts: BFS branch exploration
             │
             ├── Persistence
             │     ├── BrainState ─── Full state snapshot (save/load)
@@ -787,7 +910,7 @@ Every `brain.chat()` call:
 
     User Message
       → [Perceive]  Store as MemoryNode, LLM judges importance (1-10)
-      → [Retrieve]  Score all memories: recency + importance + relevance → top-k
+      → [Retrieve]  Score all memories: 5-axis (recency + importance + relevance + vitality + context) → top-k
       → [Render]    Persona ISS + OCEAN + emotion + memories + plan → system prompt
       → [Generate]  LLM produces response (personality-shaped)
       → [Store]     Own response saved as MemoryNode
@@ -831,6 +954,10 @@ Every `brain.chat()` call:
 | `social.read_context(text)` | Read social dynamics from conversation |
 | `social.decide_strategy(text)` | Choose personality-driven social strategy |
 | `social.universalize_check(action)` | Kant's universalization test for cooperative behavior |
+| `social.secret_guard(response, secrets)` | Check response for information leakage |
+| `tom.infer_recursive(name, model)` | Recursive ToM — what does target think about me? |
+| `tom.get_inference_depth(relationship)` | Relationship-based ToM depth |
+| `TreeOfThoughts(llm).solve(problem)` | BFS Tree of Thoughts for complex decisions |
 | `brain.reinforce_pattern(id)` | Hebbian reinforcement — strengthen successful pattern |
 | `brain.weaken_pattern(id)` | Hebbian weakening — weaken failed pattern |
 | `brain.consolidate_patterns()` | Memory consolidation — expire/promote/demote patterns |
@@ -844,19 +971,25 @@ Every `brain.chat()` call:
 
 | Model | Description |
 |-------|-------------|
-| `PersonaSpec` | 3-layer identity + 6 facets + OCEAN + PAD emotion + rules |
+| `PersonaSpec` | 3-layer identity + 6 facets + OCEAN + PAD + moral/Schwartz values + hard/soft constraints |
 | `OceanTraits` | Big Five: O/C/E/A/N scores (0.0-1.0) with auto prompt generation |
 | `EmotionalState` | PAD 3-axis (-1~+1), stimulus transition, decay, closest emotion |
 | `CharacterCard` | Tavern Card V2 compatible, parsers for W++ and SBF formats |
-| `MemoryNode` | SPO triple, importance, embedding, evidence pointers |
+| `MemoryNode` | SPO triple, importance, vitality, embedding, evidence pointers |
 | `DailyPlan` | Recursive PlanItems with time ranges and status |
-| `RetrievalResult` | Node + score breakdown (recency, importance, relevance) |
+| `RetrievalResult` | Node + 5-axis score breakdown (recency, importance, relevance, vitality, context) |
 | `EnvironmentEvent` | Event from environment (message, observation, custom) |
 | `Action` | Agent action output (speak, act, silent) |
 | `BrainState` | Full serializable snapshot (persona + memories + patterns + history) |
 | `SocialPattern` | Learned social norm from vicarious observation |
 | `CommunityProfile` | Per-community behavioral norms and tone |
-| `MentalModel` | Theory of Mind — inferred goals, knowledge, emotion of others |
+| `MentalModel` | Theory of Mind — goals, knowledge, emotion, relationship type, recursive belief |
+| `SocialEvaluation` | SOTOPIA 7-dimension social intelligence scores |
+| `MoralFoundation` | 6 moral foundation types (care, fairness, loyalty, authority, purity, liberty) |
+| `SchwartzValue` | 10 Schwartz personal value types |
+| `DecisionStyle` | 4 decision-making styles (directive, analytical, conceptual, behavioral) |
+| `RelationshipType` | 5 relationship levels (stranger → romantic) |
+| `ThoughtNode` | Tree of Thoughts node with score and parent/child links |
 | `SelfRefineConfig` | Self-Refine loop settings (axes, threshold, iterations) |
 | `SelfRefineResult` | Self-Refine execution result (original, refined, scores) |
 | `CollaborationMessage` | Single utterance in multi-agent discussion |
@@ -866,7 +999,7 @@ Every `brain.chat()` call:
 
 | Algorithm | Source | Implementation |
 |-----------|--------|----------------|
-| Memory retrieval scoring | Generative Agents (Park 2023) | `memory/retrieval.py` |
+| 5-axis memory retrieval | Generative Agents + Synaptic Memory | `memory/retrieval.py` |
 | Reflection (focal points → insights) | Generative Agents (Park 2023) | `cognition/reflect.py` |
 | OCEAN → PAD conversion | Mehrabian (1996) | `models.py:EmotionalState.from_ocean()` |
 | Emotion transition | PAD stimulus model | `models.py:EmotionalState.apply_stimulus()` |
@@ -874,12 +1007,20 @@ Every `brain.chat()` call:
 | Personality-sensitivity coupling | N → α mapping | `models.py:PersonaSpec.apply_event()` |
 | W++ parsing | Community standard | `models.py:CharacterCard.from_wpp()` |
 | SBF parsing | Community standard | `models.py:CharacterCard.from_sbf()` |
+| SOTOPIA 7-dim evaluation | Zhou et al. (ICLR 2024) | `models.py:SocialEvaluation` |
+| Relationship-based ToM depth | SOTOPIA | `cognition/tom.py` |
+| Recursive ToM | Agentic LLM Survey | `cognition/tom.py:infer_recursive()` |
+| Secret guard | SOTOPIA (universal LLM failure) | `cognition/social.py:secret_guard()` |
+| Tree of Thoughts (BFS) | Yao et al. (2023) | `cognition/tot.py` |
+| Perception bandwidth | Generative Agents (`att_bandwidth`) | `autopilot.py` |
+| Conversation cooldown | Generative Agents (`chatting_buffer`) | `cognition/dialogue.py` |
 
 ---
 
 ## References
 
 - [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442) — Memory stream, reflection, planning
+- [SOTOPIA: Interactive Social Intelligence](https://arxiv.org/abs/2310.11667) — 7-dimension social evaluation, OCEAN+moral+Schwartz profiles
 - [Agentic LLMs Survey](https://arxiv.org/abs/2503.23037) — Human-agent cooperation, ToM, social norms
 - [Mehrabian PAD Model (1996)](https://en.wikipedia.org/wiki/PAD_emotional_state_model) — Pleasure-Arousal-Dominance emotional space
 - [Big Five / OCEAN](https://en.wikipedia.org/wiki/Big_Five_personality_traits) — Five-factor personality model
@@ -889,48 +1030,58 @@ Every `brain.chat()` call:
 - [Character Card V2 Spec](https://github.com/malfoyslastname/character-card-spec-v2) — Tavern Card standard
 - [A2A Protocol](https://a2a-protocol.org/) — Agent-to-Agent discovery and communication
 
-## Project Status (v0.6.0)
+## Project Status (v0.7.0)
 
-> **Phase: Adaptive Learning — Published on [PyPI](https://pypi.org/project/agethos/)**
+> **Phase: Social Intelligence — Published on [PyPI](https://pypi.org/project/agethos/)**
 
-### Implemented
+### What's New in v0.7.0
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **Extended Personality** | SOTOPIA (ICLR 2024) | Moral values (6), Schwartz values (10), decision styles (4) |
+| **Hard/Soft Constraints** | Leaked System Prompts | Immutable rules vs context-adjustable preferences |
+| **3 Persona Archetypes** | Leaked System Prompts | Trait-based + functional + relational blending |
+| **5-Axis Retrieval** | Synaptic Memory | + vitality + context scoring (backward compatible) |
+| **SOTOPIA 7-Dim Evaluation** | SOTOPIA (ICLR 2024) | Goal/believability/knowledge/secret/relationship/social/financial |
+| **Secret Guard** | SOTOPIA | Detect and prevent information leakage in responses |
+| **Relationship-Based ToM** | SOTOPIA | Inference depth varies by relationship closeness (5 levels) |
+| **Recursive ToM** | Agentic LLM Survey | "What does A think B thinks?" — 2nd-order belief modeling |
+| **Tree of Thoughts** | Yao et al. (2023) | BFS branching for complex decision-making |
+| **Perception Bandwidth** | Generative Agents | Limit cognitive load per tick (`att_bandwidth`) |
+| **Conversation Cooldown** | Generative Agents | Prevent re-engaging same partner immediately |
+| **161 tests** | — | 105 existing + 56 new, all passing |
+
+### All Implemented Modules
 
 | Module | Status | Files |
 |--------|--------|-------|
-| **Data Models** | Done | `models.py` — OceanTraits, EmotionalState, PersonaSpec, PersonaLayer, CharacterCard, MemoryNode, PlanItem, DailyPlan, RetrievalResult, EnvironmentEvent, Action, BrainState, SocialPattern, CommunityProfile |
-| **Brain Facade** | Done | `brain.py` — chat, observe, plan_day, reflect, recall, emotion control, autopilot, save/load, export, observe_community |
-| **Persona Renderer** | Done | `persona/renderer.py` — ISS + OCEAN + emotion + memories + plan → system prompt |
-| **Memory Stream** | Done | `memory/stream.py` — append, retrieve (composite scoring), get_recent, importance tracking |
-| **Retrieval Scoring** | Done | `memory/retrieval.py` — recency × importance × relevance, min-max normalization, cosine similarity |
-| **Storage Backend** | Done | `memory/store.py` (ABC) + `storage/memory_store.py` (InMemoryStore) |
-| **Cognition: Perceive** | Done | `cognition/perceive.py` — observation → MemoryNode (LLM importance 1-10, SPO triple extraction) |
-| **Cognition: Retrieve** | Done | `cognition/retrieve.py` — composite scoring wrapper, reflection-specific retrieval |
-| **Cognition: Reflect** | Done | `cognition/reflect.py` — importance threshold → focal points → insights → depth=2+ nodes |
-| **Cognition: Plan** | Done | `cognition/plan.py` — daily plan, recursive decompose, replan on new observations |
-| **Cognition: Emotion** | Done | `cognition/emotion.py` — text → PAD auto-detection via LLM |
-| **Cognition: Dialogue** | Done | `cognition/dialogue.py` — OCEAN-driven conversation continuity (continue/redirect/disengage/initiate) |
-| **Cognition: Social** | Done | `cognition/social.py` — read context (atmosphere/tension/undercurrent), personality-driven social strategy |
-| **Cognition: Observer** | Done | `cognition/observer.py` — vicarious learning: observe → extract patterns → merge duplicates |
-| **Cognition: ToM** | Done | `cognition/tom.py` — Theory of Mind: infer/update mental models of others |
-| **Cognition: Self-Refine** | Done | `cognition/refine.py` — generate → evaluate → refine loop with configurable axes |
-| **Cognition: Collaborate** | Done | `cognition/collaborate.py` — multi-agent team_discuss (round_robin/debate/hierarchical) |
-| **Universalization** | Done | `cognition/social.py` — Kant's universalization check for cooperative behavior |
-| **Hebbian Learning** | Done | `learning/hebbian.py` — asymmetric reinforce/weaken, adaptive rate, anti-resonance |
-| **Memory Consolidation** | Done | `learning/consolidation.py` — L0→L3 tier lifecycle, promotion/demotion |
-| **L1 Auto-Evolution** | Done | `learning/evolution.py` — validated patterns → behavioral_rules, L0 protection |
-| **Retrieval Presets** | Done | `cognition/retrieve.py` — 8 intent-aware weight presets (recall, planning, etc.) |
-| **Autopilot** | Done | `autopilot.py` — autonomous loop with step()/run(), personality-driven triggers |
-| **Environment** | Done | `environment.py` — Environment ABC + QueueEnvironment + ChatLogEnvironment (JSON/JSONL) |
-| **Persistence** | Done | `brain.py` — save/load full BrainState (.brain.json), JSON serialization |
-| **Export Adapters** | Done | `export/adapters.py` — system_prompt, anthropic, openai_assistant, crewai, bedrock_agent, a2a_card |
-| **LLM Adapters** | Done | `llm/openai.py` (OpenAI + compatible via `base_url`), `llm/anthropic.py` (Anthropic Claude) |
-| **Embedding Adapter** | Done | `embedding/openai.py` (text-embedding-3-small/large/ada-002) |
-| **Character Cards** | Done | `models.py` — W++ parser, SBF parser, Tavern Card V2 → PersonaSpec conversion |
-| **Multi-turn Chat** | Done | `brain.py` — sliding window conversation history (max_history) |
-| **Factory Methods** | Done | `Brain.build()` from dict/yaml/string, `PersonaSpec.from_dict()`, `from_yaml()` |
-| **Random Generation** | Done | `OceanTraits.random()`, `PersonaSpec.random()` with partial pinning |
-| **YAML Personas** | Done | `examples/personas/` — load persona from YAML file |
-| **CI/CD** | Done | `.github/workflows/` — CI tests + PyPI publish via trusted publisher |
+| **Data Models** | Done | `models.py` — OceanTraits, EmotionalState, PersonaSpec, CharacterCard, MemoryNode, BrainState, SocialPattern, SocialEvaluation, MoralFoundation, SchwartzValue, DecisionStyle, RelationshipType |
+| **Brain Facade** | Done | `brain.py` — chat, observe, plan_day, reflect, recall, emotion, autopilot, save/load, export |
+| **Persona Renderer** | Done | `persona/renderer.py` — ISS + OCEAN + emotion + moral values + hard/soft constraints + functional/relational |
+| **Memory Stream** | Done | `memory/stream.py` — append, 5-axis retrieve, get_recent, importance tracking |
+| **5-Axis Retrieval** | Done | `memory/retrieval.py` — recency × importance × relevance × vitality × context |
+| **Cognition: Perceive** | Done | `cognition/perceive.py` — observation → MemoryNode (LLM importance 1-10, SPO triple) |
+| **Cognition: Retrieve** | Done | `cognition/retrieve.py` — 12 intent-aware presets (3-axis + 5-axis) |
+| **Cognition: Reflect** | Done | `cognition/reflect.py` — focal points → insights → depth=2+ nodes |
+| **Cognition: Plan** | Done | `cognition/plan.py` — daily plan, recursive decompose, replan |
+| **Cognition: Dialogue** | Done | `cognition/dialogue.py` — OCEAN-driven flow + conversation cooldown |
+| **Cognition: Social** | Done | `cognition/social.py` — context reading + strategy + secret guard + universalization |
+| **Cognition: ToM** | Done | `cognition/tom.py` — relationship-based depth + recursive ToM |
+| **Cognition: Self-Refine** | Done | `cognition/refine.py` — SOTOPIA 7-dim evaluation axes |
+| **Cognition: ToT** | Done | `cognition/tot.py` — Tree of Thoughts BFS branch exploration |
+| **Cognition: Collaborate** | Done | `cognition/collaborate.py` — round_robin/debate/hierarchical |
+| **Cognition: Observer** | Done | `cognition/observer.py` — vicarious learning |
+| **Hebbian Learning** | Done | `learning/hebbian.py` — asymmetric reinforce/weaken |
+| **Memory Consolidation** | Done | `learning/consolidation.py` — L0→L3 tier lifecycle |
+| **L1 Auto-Evolution** | Done | `learning/evolution.py` — patterns → behavioral_rules |
+| **Autopilot** | Done | `autopilot.py` — perception bandwidth + cooldown + OCEAN triggers |
+| **Environment** | Done | `environment.py` — QueueEnvironment + ChatLogEnvironment |
+| **Persistence** | Done | `brain.py` — save/load BrainState (.brain.json) |
+| **Export Adapters** | Done | `export/adapters.py` — 6 platform formats |
+| **LLM Adapters** | Done | `llm/openai.py`, `llm/anthropic.py` |
+| **Embedding** | Done | `embedding/openai.py` |
+| **Character Cards** | Done | W++, SBF, Tavern Card V2 |
+| **CI/CD** | Done | GitHub Actions — CI tests + PyPI publish |
 
 ### Not Yet Implemented
 

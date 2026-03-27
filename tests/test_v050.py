@@ -47,7 +47,7 @@ class TestSelfRefineConfig:
         assert config.enabled is False
         assert config.max_iterations == 2
         assert config.quality_threshold == 0.7
-        assert len(config.evaluate_axes) == 3
+        assert len(config.evaluate_axes) == 7
 
     def test_custom(self):
         config = SelfRefineConfig(

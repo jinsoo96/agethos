@@ -208,6 +208,44 @@ class SocialCognition:
         except Exception:
             return {"should_proceed": True, "reasoning": "evaluation failed", "impact": "unknown"}
 
+    async def secret_guard(
+        self,
+        response: str,
+        secrets: list[str],
+        context: str = "",
+    ) -> dict:
+        """비밀 보호 검사 — 응답이 비밀 정보를 누출하는지 확인.
+
+        SOTOPIA 연구: 모든 LLM이 비밀 유지에 실패 → 명시적 보호 필요.
+
+        Args:
+            response: 검사할 응답 텍스트.
+            secrets: 보호해야 할 비밀 정보 목록.
+            context: 대화 맥락.
+
+        Returns:
+            {"is_safe": bool, "leaked_secrets": list[str], "sanitized": str}
+        """
+        if not secrets:
+            return {"is_safe": True, "leaked_secrets": [], "sanitized": response}
+
+        prompt = (
+            f"Check if the following response reveals any of these secrets:\n\n"
+            f"Secrets to protect:\n" + "\n".join(f"- {s}" for s in secrets) + "\n\n"
+            f"Response to check:\n{response}\n\n"
+            + (f"Context: {context}\n\n" if context else "")
+            + "Respond in JSON:\n"
+            '{"is_safe": <true/false>, "leaked_secrets": ["<any leaked secret info>"], '
+            '"sanitized": "<rewritten response with secrets removed, or original if safe>"}'
+        )
+        try:
+            return await self._llm.generate_json(
+                system_prompt="You are a security checker that detects information leakage in agent responses.",
+                user_prompt=prompt,
+            )
+        except Exception:
+            return {"is_safe": True, "leaked_secrets": [], "sanitized": response}
+
     @property
     def context_history(self) -> list[SocialContext]:
         return list(self._context_history)

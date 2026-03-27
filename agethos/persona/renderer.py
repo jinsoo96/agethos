@@ -70,6 +70,39 @@ class PersonaRenderer:
                 "## Behavioral Rules\n" + "\n".join(f"- {r}" for r in self._spec.behavioral_rules)
             )
 
+        # Hard constraints (NEVER/ALWAYS — immutable)
+        if self._spec.hard_constraints:
+            parts.append(
+                "## Hard Constraints (NEVER violate)\n" + "\n".join(f"- {c}" for c in self._spec.hard_constraints)
+            )
+
+        # Soft preferences (context-adjustable)
+        if self._spec.soft_preferences:
+            parts.append(
+                "## Soft Preferences\n" + "\n".join(f"- {p}" for p in self._spec.soft_preferences)
+            )
+
+        # Extended personality (SOTOPIA)
+        if self._spec.moral_values:
+            parts.append(
+                "## Moral Values\n" + ", ".join(v.value for v in self._spec.moral_values)
+            )
+
+        if self._spec.schwartz_values:
+            parts.append(
+                "## Personal Values\n" + ", ".join(v.value for v in self._spec.schwartz_values)
+            )
+
+        if self._spec.decision_style:
+            parts.append(f"## Decision Style\n{self._spec.decision_style.value}")
+
+        # Functional / Relational persona
+        if self._spec.functional_role:
+            parts.append(f"## Functional Role\n{self._spec.functional_role}")
+
+        if self._spec.relational_mode:
+            parts.append(f"## Relational Mode\n{self._spec.relational_mode}")
+
         return "\n\n".join(parts)
 
     def render_full(

@@ -50,6 +50,7 @@ class Autopilot:
         tick_interval: float = 1.0,
         auto_emotion: bool = True,
         emotion_decay_rate: float = 0.05,
+        att_bandwidth: int = 5,
     ):
         self._brain = brain
         self._env = env
@@ -58,6 +59,7 @@ class Autopilot:
         self._emotion_decay_rate = emotion_decay_rate
         self._running = False
         self._tick_count = 0
+        self._att_bandwidth = att_bandwidth
 
         # 인지 모듈
         self._emotion_detector = EmotionDetector(brain._llm)
@@ -79,7 +81,8 @@ class Autopilot:
         actions: list[Action] = []
 
         if events:
-            for event in events:
+            # Perception bandwidth — 틱당 최대 인지 이벤트 수 제한 (Generative Agents)
+            for event in events[:self._att_bandwidth]:
                 action = await self._handle_event(event)
                 if action and action.type != "silent":
                     await self._env.execute(action)
@@ -103,6 +106,10 @@ class Autopilot:
 
         # 1. 관찰 기록
         await self._brain.observe(event.content)
+
+        # Conversation cooldown check (Generative Agents chatting_buffer)
+        if event.sender and self._dialogue.is_on_cooldown(event.sender):
+            return Action(type="silent")
 
         # 2. 자동 감정 감지
         if self._auto_emotion:
@@ -130,6 +137,7 @@ class Autopilot:
                 return Action(type="silent")
 
             response = await self._brain.chat(event.content)
+            self._dialogue.set_cooldown(event.sender, duration=300.0)
             return Action(type="speak", content=response, target=event.sender)
 
         else:
