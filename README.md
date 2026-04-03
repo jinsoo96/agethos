@@ -45,7 +45,7 @@ Agethos borrows the answer from **cognitive science, personality psychology, and
 | **Vicarious learning** | Observe chats → extract social patterns → internalize | None | None | None |
 | **State persistence** | Save/load full brain state (.brain.json) | None | None | None |
 | **Cross-platform export** | Anthropic, OpenAI, CrewAI, Bedrock, A2A | None | None | None |
-| **LLM-agnostic** | OpenAI, Anthropic, custom (`base_url`) | OpenAI only | Various | N/A |
+| **LLM-agnostic** | OpenAI, Anthropic, LiteLLM (100+ providers), LangChain | OpenAI only | Various | N/A |
 
 ---
 
@@ -149,6 +149,8 @@ Two agents with identical questions, different OCEAN profiles — tested with `g
     pip install agethos                    # Core (pydantic only)
     pip install agethos[openai]            # + OpenAI LLM & embeddings
     pip install agethos[anthropic]         # + Anthropic Claude
+    pip install agethos[litellm]           # + LiteLLM (Gemini, Groq, Mistral, 100+ providers)
+    pip install agethos[langchain]         # + LangChain integration
     pip install agethos[all]               # Everything
 
 ## Quick Start
@@ -166,7 +168,7 @@ brain = Brain.build(
         "tone": "Concise and analytical",
         "rules": ["Prefer data over opinions", "Keep responses structured"],
     },
-    llm="openai",  # or "anthropic"
+    llm="openai",  # or "anthropic", "litellm"
 )
 reply = await brain.chat("How's the recommendation system going?")
 ```
@@ -223,7 +225,52 @@ reply = await brain.chat("How's the recommendation system going?")
 reply2 = await brain.chat("Can you elaborate on the caching part?")
 ```
 
-### 4. Emotional Events
+### 4. LiteLLM — 100+ Providers (Gemini, Groq, Mistral, ...)
+
+```python
+# Google Gemini
+brain = Brain.build(persona=spec, llm="litellm", model="gemini/gemini-2.0-flash")
+
+# Groq (ultra-fast inference)
+brain = Brain.build(persona=spec, llm="litellm", model="groq/llama3-70b-8192")
+
+# Mistral
+brain = Brain.build(persona=spec, llm="litellm", model="mistral/mistral-large-latest")
+
+# Azure OpenAI
+brain = Brain.build(persona=spec, llm="litellm", model="azure/my-deployment", base_url="https://xxx.openai.azure.com")
+
+# AWS Bedrock
+brain = Brain.build(persona=spec, llm="litellm", model="bedrock/anthropic.claude-3-sonnet-20240229-v1:0")
+
+# Or instantiate directly for extra kwargs
+from agethos.llm.litellm import LiteLLMAdapter
+adapter = LiteLLMAdapter(model="gemini/gemini-2.0-flash", api_key="...", max_tokens=4096)
+brain = Brain(persona=spec, llm=adapter)
+```
+
+### 5. LangChain / LangGraph Integration
+
+```python
+from agethos import Brain
+from agethos.llm.langchain import LangChainAdapter
+
+# Any LangChain ChatModel works
+from langchain_openai import ChatOpenAI
+brain = Brain(persona=spec, llm=LangChainAdapter(ChatOpenAI(model="gpt-4o")))
+
+# Google Gemini via LangChain
+from langchain_google_genai import ChatGoogleGenerativeAI
+brain = Brain(persona=spec, llm=LangChainAdapter(ChatGoogleGenerativeAI(model="gemini-2.0-flash")))
+
+# Anthropic via LangChain
+from langchain_anthropic import ChatAnthropic
+brain = Brain(persona=spec, llm=LangChainAdapter(ChatAnthropic(model="claude-sonnet-4-20250514")))
+
+# Works seamlessly in LangGraph nodes — same Brain, same adapter
+```
+
+### 6. Emotional Events
 
 ```python
 # Apply an event that triggers emotion
@@ -234,7 +281,7 @@ print(brain.emotion.closest_emotion())  # "sadness"
 brain.decay_emotion(rate=0.1)
 ```
 
-### 5. Random Persona Generation
+### 7. Random Persona Generation
 
 ```python
 from agethos import PersonaSpec, OceanTraits
@@ -253,7 +300,7 @@ ocean = OceanTraits.random(E=0.2)  # pin extraversion, randomize rest
 brain = Brain.build(persona=PersonaSpec.random(), llm="openai")
 ```
 
-### 6. Character Card Import (W++ / SBF / Tavern Card)
+### 8. Character Card Import (W++ / SBF / Tavern Card)
 
 ```python
 from agethos import CharacterCard
@@ -901,8 +948,8 @@ pilot = brain.autopilot(env, att_bandwidth=3)  # max 3 events per tick
             ├── Character Cards ──── W++ / SBF / Tavern Card V2 → PersonaSpec
             │
             └── Adapters
-                  ├── LLMAdapter (ABC) ── OpenAI / Anthropic / custom (base_url)
-                  └── EmbeddingAdapter (ABC) ── OpenAI / custom
+                  ├── LLMAdapter (ABC) ── OpenAI / Anthropic / LiteLLM (100+) / LangChain
+                  └── EmbeddingAdapter (ABC) ── OpenAI / Ollama / SentenceTransformers
 
 ## Cognitive Loop
 
@@ -1030,9 +1077,19 @@ Every `brain.chat()` call:
 - [Character Card V2 Spec](https://github.com/malfoyslastname/character-card-spec-v2) — Tavern Card standard
 - [A2A Protocol](https://a2a-protocol.org/) — Agent-to-Agent discovery and communication
 
-## Project Status (v0.7.0)
+## Project Status (v0.9.0)
 
-> **Phase: Social Intelligence — Published on [PyPI](https://pypi.org/project/agethos/)**
+> **Phase: Universal LLM — Published on [PyPI](https://pypi.org/project/agethos/)**
+
+### What's New in v0.9.0
+
+| Feature | Description |
+|---------|-------------|
+| **LiteLLM Adapter** | 100+ LLM providers via single interface (Gemini, Groq, Mistral, Cohere, Azure, Bedrock, etc.) |
+| **LangChain Adapter** | Wrap any LangChain `BaseChatModel` — works with LangChain and LangGraph |
+| **`Brain.build(llm="litellm")`** | String-based LiteLLM resolution with model/api_key/base_url |
+| **Optional dependencies** | `pip install agethos[litellm]` / `agethos[langchain]` |
+| **211 tests** | 197 existing + 14 new, all passing |
 
 ### What's New in v0.7.0
 
@@ -1078,8 +1135,8 @@ Every `brain.chat()` call:
 | **Environment** | Done | `environment.py` — QueueEnvironment + ChatLogEnvironment |
 | **Persistence** | Done | `brain.py` — save/load BrainState (.brain.json) |
 | **Export Adapters** | Done | `export/adapters.py` — 6 platform formats |
-| **LLM Adapters** | Done | `llm/openai.py`, `llm/anthropic.py` |
-| **Embedding** | Done | `embedding/openai.py` |
+| **LLM Adapters** | Done | `llm/openai.py`, `llm/anthropic.py`, `llm/litellm.py`, `llm/langchain.py` |
+| **Embedding** | Done | `embedding/openai.py`, `embedding/ollama.py`, `embedding/sbert.py` |
 | **Character Cards** | Done | W++, SBF, Tavern Card V2 |
 | **CI/CD** | Done | GitHub Actions — CI tests + PyPI publish |
 

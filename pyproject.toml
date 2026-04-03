@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agethos"
-version = "0.8.0"
+version = "0.9.0"
 description = "A brain for AI agents — persona, memory, reflection, and planning"
 readme = "README.md"
 license = "MIT"
@@ -16,9 +16,11 @@ dependencies = [
 [project.optional-dependencies]
 openai = ["openai>=1.0"]
 anthropic = ["anthropic>=0.30"]
+litellm = ["litellm>=1.0"]
+langchain = ["langchain-core>=0.3"]
 yaml = ["pyyaml>=6.0"]
 sbert = ["sentence-transformers>=2.0"]
-all = ["agethos[openai,anthropic,yaml,sbert]"]
+all = ["agethos[openai,anthropic,litellm,langchain,yaml,sbert]"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pyyaml>=6.0"]
 
 [tool.pytest.ini_options]

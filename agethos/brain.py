@@ -47,8 +47,19 @@ def _resolve_llm(
     elif provider in ("anthropic", "claude"):
         from agethos.llm.anthropic import AnthropicAdapter
         return AnthropicAdapter(model=model or "claude-sonnet-4-20250514", api_key=api_key)
+    elif provider == "litellm":
+        from agethos.llm.litellm import LiteLLMAdapter
+        kwargs: dict = {}
+        if api_key is not None:
+            kwargs["api_key"] = api_key
+        if base_url is not None:
+            kwargs["api_base"] = base_url
+        return LiteLLMAdapter(model=model or "gpt-4o-mini", **kwargs)
     else:
-        raise ValueError(f"Unknown LLM provider: {provider}. Use 'openai' or 'anthropic'.")
+        raise ValueError(
+            f"Unknown LLM provider: {provider}. "
+            "Use 'openai', 'anthropic', 'litellm', or pass an LLMAdapter instance."
+        )
 
 
 class Brain:
