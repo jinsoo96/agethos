@@ -157,7 +157,7 @@ def _export_a2a_card(brain: Brain, **kwargs) -> dict:
     return {
         "name": persona.name,
         "description": description,
-        "version": "0.7.0",
+        "version": "0.8.0",
         "skills": skills,
         "provider": {"name": "agethos"},
     }

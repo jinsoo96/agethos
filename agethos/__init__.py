@@ -6,7 +6,22 @@
 
 from agethos.autopilot import Autopilot
 from agethos.brain import Brain
+from agethos.embedding import resolve_embedder
+from agethos.embedding.base import EmbeddingAdapter
 from agethos.environment import ChatLogEnvironment, Environment, QueueEnvironment
+from agethos.export import (
+    extract_fingerprint,
+    inspect_brain,
+    pack_brain,
+    transplant,
+    unpack_brain,
+)
+from agethos.export.transplant import (
+    AutoGenTransplant,
+    CrewAITransplant,
+    LangGraphTransplant,
+    TransplantAdapter,
+)
 from agethos.models import (
     Action,
     BrainState,
@@ -38,6 +53,7 @@ from agethos.models import (
 __all__ = [
     "Action",
     "Autopilot",
+    "AutoGenTransplant",
     "Brain",
     "BrainState",
     "CharacterCard",
@@ -45,11 +61,14 @@ __all__ = [
     "CollaborationMessage",
     "CollaborationResult",
     "CommunityProfile",
+    "CrewAITransplant",
     "DailyPlan",
     "DecisionStyle",
+    "EmbeddingAdapter",
     "EmotionalState",
     "Environment",
     "EnvironmentEvent",
+    "LangGraphTransplant",
     "MentalModel",
     "MemoryNode",
     "MoralFoundation",
@@ -66,4 +85,12 @@ __all__ = [
     "SelfRefineResult",
     "SocialEvaluation",
     "SocialPattern",
+    "TransplantAdapter",
+    # Functions
+    "extract_fingerprint",
+    "inspect_brain",
+    "pack_brain",
+    "resolve_embedder",
+    "transplant",
+    "unpack_brain",
 ]

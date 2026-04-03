@@ -130,6 +130,8 @@ class Brain:
         model: str | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
+        embedder: str | EmbeddingAdapter | None = None,
+        embedder_model: str | None = None,
         **kwargs,
     ) -> Brain:
         """Convenience factory — build a Brain from dicts and strings.
@@ -140,6 +142,9 @@ class Brain:
             model: Model name override (e.g. "gpt-4o", "claude-opus-4-20250514").
             api_key: API key override (defaults to env var).
             base_url: Custom API endpoint for OpenAI-compatible providers.
+            embedder: Embedding provider string or adapter instance.
+                Supported: "openai", "ollama", "sentence-transformer".
+            embedder_model: Embedding model name override.
             **kwargs: Passed to Brain.__init__ (e.g. max_history, reflection_threshold).
 
         Examples::
@@ -147,19 +152,17 @@ class Brain:
             # OpenAI
             brain = Brain.build(persona={...}, llm="openai")
 
+            # With local embedding
+            brain = Brain.build(
+                persona={...}, llm="openai",
+                embedder="ollama", embedder_model="nomic-embed-text",
+            )
+
             # Ollama (local)
             brain = Brain.build(
                 persona={...}, llm="openai",
                 model="qwen2.5:7b",
                 base_url="http://localhost:11434/v1",
-            )
-
-            # Qwen via DashScope
-            brain = Brain.build(
-                persona={...}, llm="openai",
-                model="qwen-plus",
-                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-                api_key="sk-your-dashscope-key",
             )
         """
         # Resolve persona
@@ -171,6 +174,19 @@ class Brain:
         # Resolve LLM
         if isinstance(llm, str):
             llm = _resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
+
+        # Resolve embedder
+        if isinstance(embedder, str):
+            from agethos.embedding import resolve_embedder
+            embedder = resolve_embedder(
+                embedder,
+                model=embedder_model,
+                api_key=api_key,
+                base_url=base_url,
+            )
+
+        if embedder is not None:
+            kwargs["embedder"] = embedder
 
         return cls(persona=persona, llm=llm, **kwargs)
 
@@ -369,12 +385,12 @@ class Brain:
     async def save(self, path: str) -> None:
         """인격 상태 전체를 .brain.json 파일로 저장.
 
-        PersonaSpec + 기억 + 학습 패턴 + 대화 기록을 직렬화.
+        PersonaSpec + 기억 + 학습 패턴 + 대화 기록��� 직렬화.
         """
         all_memories = await self._memory.store.get_all()
 
         state = BrainState(
-            version="0.7.0",
+            version="0.8.0",
             last_active=time.time(),
             total_interactions=len([h for h in self._history if h.get("role") == "user"]),
             persona=self._persona,
@@ -399,13 +415,13 @@ class Brain:
         base_url: str | None = None,
         **kwargs,
     ) -> Brain:
-        """저장된 .brain.json에서 Brain 복원.
+        """저장된 .brain.json에��� Brain 복원.
 
-        경험/기억/학습 패턴이 그대로 복원됨.
+        ���험/기억/학습 패턴이 그대로 복원됨.
 
         Args:
             path: .brain.json 파일 경로.
-            llm: LLM 프로바이더 또는 어댑터 인스턴스.
+            llm: LLM 프로바���더 또는 어댑터 인스���스.
             **kwargs: Brain.__init__에 전달.
         """
         with open(path, encoding="utf-8") as f:
@@ -436,6 +452,115 @@ class Brain:
         brain._seed_loaded = True
 
         return brain
+
+    # ── .brain 포터블 패키징 ──
+
+    async def pack(self, path: str, **kwargs) -> str:
+        """.brain ZIP 포맷으로 패키징 (포터블 뇌).
+
+        구조: manifest.json + persona.json + memories.jsonl
+              + patterns.json + mental_models.json + fingerprint.svg
+
+        Args:
+            path: 저장 경로 (.brain 확장자 권장).
+            **kwargs: include_history, include_fingerprint 등.
+
+        Returns:
+            저장된 파일 경로 문자열.
+        """
+        from agethos.export.brain_file import pack_brain
+        result = await pack_brain(self, path, **kwargs)
+        return str(result)
+
+    @classmethod
+    async def unpack(
+        cls,
+        path: str,
+        llm: str | LLMAdapter,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        **kwargs,
+    ) -> Brain:
+        """.brain ZIP에서 Brain 복원.
+
+        Args:
+            path: .brain 파일 경로.
+            llm: LLM 프로바이더 또는 어댑터 인스턴스.
+
+        Returns:
+            복원된 Brain 인스턴스.
+        """
+        from agethos.export.brain_file import unpack_brain
+        return await unpack_brain(
+            path, llm,
+            model=model, api_key=api_key, base_url=base_url,
+            **kwargs,
+        )
+
+    async def pack_png(self, image_path: str, output_path: str, **kwargs) -> str:
+        """.brain 데이터를 PNG 이미지에 임베딩 (스테가노그래피).
+
+        Args:
+            image_path: 베이스 PNG 이미지 경로.
+            output_path: 출력 .brain.png 파일 경로.
+
+        Returns:
+            저장된 파일 경로 문자열.
+        """
+        from agethos.export.brain_png import pack_brain_png
+        result = await pack_brain_png(self, image_path, output_path, **kwargs)
+        return str(result)
+
+    @classmethod
+    async def unpack_png(
+        cls,
+        png_path: str,
+        llm: str | LLMAdapter,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        **kwargs,
+    ) -> Brain:
+        """.brain.png에서 Brain 복원.
+
+        Args:
+            png_path: .brain.png 파일 경���.
+            llm: LLM 프로바이더 또는 어댑터 인스턴스.
+
+        Returns:
+            복원된 Brain 인스턴스.
+        """
+        from agethos.export.brain_png import unpack_brain_png
+        return await unpack_brain_png(
+            png_path, llm,
+            model=model, api_key=api_key, base_url=base_url,
+            **kwargs,
+        )
+
+    def transplant(self, framework: str, **kwargs):
+        """Brain을 타 프레임워크에 이식.
+
+        Args:
+            framework: 타겟 프레임워크 ("crewai", "autogen", "langgraph").
+            **kwargs: 프레임워크별 추가 인자.
+
+        Returns:
+            프레임워크 에이전트 또는 노드 함수.
+
+        Usage::
+
+            # CrewAI
+            agent = brain.transplant("crewai", tools=[...])
+
+            # AutoGen
+            agent = brain.transplant("autogen", llm_config={...})
+
+            # LangGraph
+            node_func = brain.transplant("langgraph")
+        """
+        from agethos.export.transplant import transplant
+        return transplant(self, framework, **kwargs)
 
     # ── Export 어댑터 ──
 

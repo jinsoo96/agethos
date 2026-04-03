@@ -531,7 +531,7 @@ class TestBrainStateVersion:
     def test_default_version(self):
         spec = PersonaSpec(name="Test")
         state = BrainState(persona=spec)
-        assert state.version == "0.7.0"
+        assert state.version == "0.8.0"
 
 
 # ────────────────────────── Export version ──────────────────────────
@@ -545,7 +545,7 @@ class TestExportVersion:
         brain.persona = PersonaSpec(name="Test", values=["quality"])
         brain.social_patterns = []
         card = _export_a2a_card(brain)
-        assert card["version"] == "0.7.0"
+        assert card["version"] == "0.8.0"
 
 
 # ────────────────────────── Integration: Full PersonaSpec ──────────────────────────

@@ -799,7 +799,7 @@ class BrainState(BaseModel):
     .brain.json 파일로 직렬화하여 인격의 설계도 + 경험 + 학습을 보존.
     """
 
-    version: str = "0.7.0"
+    version: str = "0.8.0"
     created_at: float = Field(default_factory=time.time)
     last_active: float = Field(default_factory=time.time)
     total_interactions: int = 0
