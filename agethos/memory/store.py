@@ -44,3 +44,7 @@ class StorageBackend(ABC):
     async def count(self) -> int:
         """총 기억 수."""
         ...
+
+    async def delete(self, node_id: str) -> None:
+        """기억 노드 삭제 (망각). 기본 미구현 — 백엔드가 선택적으로 지원."""
+        raise NotImplementedError("this StorageBackend does not support delete()")

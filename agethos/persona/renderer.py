@@ -43,6 +43,9 @@ class PersonaRenderer:
         # OCEAN personality
         if self._spec.ocean:
             parts.append("## Personality Profile (Big Five / OCEAN)\n" + self._spec.ocean.to_prompt())
+            # Trait → cognition policy: make traits causally shape reasoning, not just tone.
+            from agethos.persona.policy import CognitivePolicy
+            parts.append(CognitivePolicy.from_ocean(self._spec.ocean).to_prompt())
 
         # Tone
         if self._spec.tone:

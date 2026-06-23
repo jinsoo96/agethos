@@ -12,6 +12,37 @@
 
 ---
 
+## What's new in 0.10.0 — causal cognition, closed loops, measurable
+
+Traits and emotion now *drive behavior*, the memory loop is closed, and you can
+**measure** it — grounded in recent research (BIG5-CHAT, Emotional RAG, persona-drift,
+SOTOPIA / CharacterEval).
+
+- **Trait → Cognition policy** (`CognitivePolicy`) — OCEAN now causally shapes *reasoning*,
+  not just tone: planning depth + verification (Conscientiousness), risk threshold +
+  exploration (Openness), hedging (Neuroticism), initiative (Extraversion), concession
+  (Agreeableness). Auto-injected into the persona prompt as concrete directives.
+- **Emotion → Memory coupling** — memories are tagged with their encoding emotion; an
+  **arousal-salience** retrieval axis surfaces emotionally charged memories and makes them
+  **decay more slowly**. Plus a real **vitality** lifecycle: access-reinforcement,
+  `decay_vitality()`, and `forget()` (prunes faded, low-salience memories; protects salient).
+- **Keyword-fallback retrieval** — relevance now works with **no embedder** (lexical Jaccard),
+  so the memory stream is useful zero-infra.
+- **PAD momentum dynamics** — `EmotionalState.step()` gives emotion inertia/overshoot
+  (2nd-order), and `from_label()` converts a discrete emotion to a PAD impulse.
+- **`agethos.eval`** — an in-box harness: `persona_consistency` / `persona_drift_curve`,
+  `retrieval_metrics` (precision/recall/MRR/NDCG), and **`transplant_fidelity`** (proves the
+  brain survives an export → re-import).
+
+```python
+from agethos import CognitivePolicy, OceanTraits, eval
+pol = CognitivePolicy.from_ocean(OceanTraits.random(C=0.9, O=0.2))
+print(pol.to_directives())                        # traits → concrete reasoning instructions
+print(eval.transplant_fidelity(before, after))    # {'persona':.., 'ocean':.., 'overall':..}
+```
+
+---
+
 ## Why
 
 LLM agents have **no identity.** Every conversation starts from zero — no personality continuity, no memory of past interactions, no emotional consistency.

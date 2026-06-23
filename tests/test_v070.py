@@ -363,7 +363,7 @@ class TestSecretGuard:
         class FakeLLM:
             pass
         sc = SocialCognition(FakeLLM(), name="test")
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             sc.secret_guard("Hello, nice to meet you", secrets=[])
         )
         assert result["is_safe"] is True

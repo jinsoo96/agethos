@@ -8,9 +8,22 @@ synaptic-memory의 5-axis resonance scoring 참고.
 from __future__ import annotations
 
 import math
+import re
 import time
 
 from agethos.models import MemoryNode, RetrievalResult
+
+_WORD = re.compile(r"[\w']+", re.UNICODE)
+
+
+def _tokens(text: str) -> set[str]:
+    return {t.lower() for t in _WORD.findall(text or "") if len(t) > 1}
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -42,6 +55,8 @@ def compute_retrieval_scores(
     decay_factor: float = 0.995,
     weights: tuple[float, ...] = (1.0, 1.0, 1.0),
     context_tags: list[str] | None = None,
+    query: str | None = None,
+    salience_weight: float = 0.0,
 ) -> list[RetrievalResult]:
     """5축 복합 점수 기반 기억 검색.
 
@@ -74,20 +89,33 @@ def compute_retrieval_scores(
     w = tuple(weights) + (0.0,) * (5 - len(weights)) if len(weights) < 5 else tuple(weights)
     w_r, w_i, w_v, w_vit, w_ctx = w[0], w[1], w[2], w[3], w[4]
 
+    query_tokens = _tokens(query) if query else set()
+
     # Raw scores
     raw_recency = []
     raw_importance = []
     raw_relevance = []
     raw_vitality = []
     raw_context = []
+    raw_salience = []
 
     for node in nodes:
+        salience = max(0.0, min(1.0, getattr(node, "emotional_salience", 0.0)))
+        raw_salience.append(salience)
+
+        # Arousal-modulated decay: emotionally salient memories fade more slowly
+        # (Emotional RAG / generative-agents gap). decay -> 1.0 as salience -> 1.0.
+        eff_decay = decay_factor + (1.0 - decay_factor) * salience
         hours_since = max(0, (now - node.last_accessed) / 3600)
-        raw_recency.append(decay_factor ** hours_since)
+        raw_recency.append(eff_decay ** hours_since)
         raw_importance.append(node.importance / 10.0)
 
         if query_embedding and node.embedding:
             raw_relevance.append(cosine_similarity(query_embedding, node.embedding))
+        elif query_tokens:
+            # No embedding → keyword/lexical fallback (so relevance isn't always 0)
+            node_tokens = _tokens(node.description) | {k.lower() for k in node.keywords}
+            raw_relevance.append(_jaccard(query_tokens, node_tokens))
         else:
             raw_relevance.append(0.0)
 
@@ -110,6 +138,7 @@ def compute_retrieval_scores(
     norm_relevance = _min_max_normalize(raw_relevance)
     norm_vitality = _min_max_normalize(raw_vitality)
     norm_context = _min_max_normalize(raw_context)
+    norm_salience = _min_max_normalize(raw_salience)
 
     # Weighted sum
     results = []
@@ -120,6 +149,7 @@ def compute_retrieval_scores(
             + w_v * norm_relevance[i]
             + w_vit * norm_vitality[i]
             + w_ctx * norm_context[i]
+            + salience_weight * norm_salience[i]
         )
         results.append(
             RetrievalResult(
@@ -130,6 +160,7 @@ def compute_retrieval_scores(
                 relevance_score=norm_relevance[i],
                 vitality_score=norm_vitality[i],
                 context_score=norm_context[i],
+                salience_score=norm_salience[i],
             )
         )
 

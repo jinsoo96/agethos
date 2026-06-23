@@ -1,4 +1,5 @@
+from agethos.persona.policy import CognitivePolicy
 from agethos.persona.renderer import PersonaRenderer
 from agethos.persona.spec import PersonaLayer, PersonaSpec
 
-__all__ = ["PersonaRenderer", "PersonaSpec", "PersonaLayer"]
+__all__ = ["PersonaRenderer", "PersonaSpec", "PersonaLayer", "CognitivePolicy"]

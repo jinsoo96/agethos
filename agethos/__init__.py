@@ -22,6 +22,7 @@ from agethos.export.transplant import (
     LangGraphTransplant,
     TransplantAdapter,
 )
+from agethos.persona import CognitivePolicy
 from agethos.models import (
     Action,
     BrainState,
@@ -60,6 +61,7 @@ __all__ = [
     "ChatLogEnvironment",
     "CollaborationMessage",
     "CollaborationResult",
+    "CognitivePolicy",
     "CommunityProfile",
     "CrewAITransplant",
     "DailyPlan",

@@ -151,8 +151,13 @@ class AutoGenTransplant(TransplantAdapter):
 
         def reply_func(recipient, messages, sender, config):
             last_msg = messages[-1].get("content", "") if messages else ""
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
+            # Py3.12-safe: get_event_loop() raises with no running loop; probe the running one.
+            try:
+                asyncio.get_running_loop()
+                running = True
+            except RuntimeError:
+                running = False
+            if running:
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor() as pool:
                     reply = pool.submit(asyncio.run, brain.chat(last_msg)).result()

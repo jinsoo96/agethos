@@ -92,7 +92,11 @@ class MemoryNode(BaseModel):
     created_at: float = Field(default_factory=time.time)
     last_accessed: float = Field(default_factory=time.time)
     access_count: int = 0
-    vitality: float = 1.0  # 활력도 (시간에 따라 감쇠, 0.0~1.0)
+    vitality: float = 1.0  # 활력도 (접근 시 강화, 시간에 따라 감쇠, 0.0~1.0)
+
+    # 인코딩 시점 감정 (감정→기억 결합). salience = |arousal| — 각성도 높은 사건은 더 오래/강하게 남는다.
+    encoding_pad: tuple[float, float, float] | None = None
+    emotional_salience: float = 0.0
 
     # Embedding
     embedding: list[float] | None = None
@@ -111,6 +115,7 @@ class RetrievalResult(BaseModel):
     relevance_score: float = 0.0
     vitality_score: float = 0.0
     context_score: float = 0.0
+    salience_score: float = 0.0
 
 
 # ────────────────────────── OCEAN (Big Five) ──────────────────────────
@@ -231,6 +236,9 @@ class EmotionalState(BaseModel):
     arousal: float = Field(0.0, ge=-1.0, le=1.0)
     dominance: float = Field(0.0, ge=-1.0, le=1.0)
 
+    # 2차(모멘텀) 동역학용 속도. 0이면 기존 1차 거동과 동일 (하위호환).
+    velocity: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
     # 기본 감정별 PAD 좌표 (Mehrabian, 1996)
     EMOTION_MAP: dict[str, tuple[float, float, float]] = {
         "joy": (0.76, 0.48, 0.35),
@@ -318,6 +326,37 @@ class EmotionalState(BaseModel):
             pleasure=max(-1, min(1, base.pleasure + (self.pleasure - base.pleasure) * factor)),
             arousal=max(-1, min(1, base.arousal + (self.arousal - base.arousal) * factor)),
             dominance=max(-1, min(1, base.dominance + (self.dominance - base.dominance) * factor)),
+        )
+
+    @classmethod
+    def from_label(cls, label: str, intensity: float = 1.0) -> EmotionalState:
+        """이산 감정 라벨 → PAD 임펄스 (강도 스케일). 미지 라벨이면 중립."""
+        pad = cls().EMOTION_MAP.get(label)
+        if pad is None:
+            return cls()
+        i = max(0.0, min(1.0, intensity))
+        return cls(pleasure=pad[0] * i, arousal=pad[1] * i, dominance=pad[2] * i)
+
+    def step(
+        self,
+        stimulus_pad: tuple[float, float, float],
+        momentum: float = 0.85,
+    ) -> EmotionalState:
+        """2차(모멘텀) 감정 동역학 — 관성이 있어 사람처럼 부드럽게 변하고 overshoot 한다.
+
+        velocity ← μ·velocity + (1-μ)·(stimulus - state); state ← clamp(state + velocity).
+        CoRE affective dynamics (μ≈0.8~0.95). 1차 apply_stimulus 보다 시간 연속성이 자연스럽다.
+        """
+        sp, sa, sd = stimulus_pad
+        vp, va, vd = self.velocity
+        nvp = momentum * vp + (1 - momentum) * (sp - self.pleasure)
+        nva = momentum * va + (1 - momentum) * (sa - self.arousal)
+        nvd = momentum * vd + (1 - momentum) * (sd - self.dominance)
+        return EmotionalState(
+            pleasure=max(-1, min(1, self.pleasure + nvp)),
+            arousal=max(-1, min(1, self.arousal + nva)),
+            dominance=max(-1, min(1, self.dominance + nvd)),
+            velocity=(nvp, nva, nvd),
         )
 
     def closest_emotion(self) -> str:
@@ -707,6 +746,13 @@ class PersonaSpec(BaseModel):
             return
         baseline = EmotionalState.from_ocean(self.ocean) if self.ocean else None
         self.emotion = self.emotion.decay(baseline=baseline, rate=rate)
+
+    def cognitive_policy(self):
+        """OCEAN → CognitivePolicy (traits causally shaping reasoning). None if no OCEAN."""
+        if not self.ocean:
+            return None
+        from agethos.persona.policy import CognitivePolicy
+        return CognitivePolicy.from_ocean(self.ocean)
 
 
 # ────────────────────────── Plan ──────────────────────────

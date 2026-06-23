@@ -38,3 +38,9 @@ class InMemoryStore(StorageBackend):
 
     async def count(self) -> int:
         return len(self._nodes)
+
+    async def delete(self, node_id: str) -> None:
+        if node_id not in self._index:
+            return
+        self._nodes = [n for n in self._nodes if n.id != node_id]
+        self._index = {n.id: i for i, n in enumerate(self._nodes)}
