@@ -12,6 +12,26 @@
 
 ---
 
+## What's new in 0.12.0 — persona-vector steering, real benchmarks, async
+
+- **Activation steering / persona vectors** (`agethos.steering`) — extract an OCEAN persona
+  vector from contrastive prompt pairs and steer it at inference (deeper than prompting);
+  multi-trait vectors orthogonalized to avoid interference. Pure-Python math +
+  `MockSteeringBackend`; optional `TransformersSteeringBackend` (`pip install agethos[steering]`).
+- **Benchmark adapters** (`agethos.eval`) — LoCoMo long-term memory harness
+  (`ingest_conversation` + `evaluate_recall`) and Sotopia adapter
+  (`persona_to_sotopia_profile` + `score_episode`, 7-dimension rubric).
+- **Async concurrency** (`agethos.concurrency`) — `gather_bounded` / `amap`; reflection and
+  A-MEM evolution now run their independent LLM calls concurrently (wall-clock = slowest call).
+
+```python
+from agethos.steering import extract_persona_vectors, combine, MockSteeringBackend
+vecs = extract_persona_vectors(MockSteeringBackend())   # OCEAN persona vectors
+from agethos import eval                                 # eval.evaluate_recall / eval.persona_to_sotopia_profile
+```
+
+---
+
 ## What's new in 0.11.0 — arbitrated memory, evolution, perspective-taking, relationships, playbook
 
 Five research-backed capabilities (Mem0, A-MEM, SimToM, AgentSociety, ACE) — all additive,

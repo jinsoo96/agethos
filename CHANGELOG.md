@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.12.0 — persona-vector steering, real-benchmark adapters, async concurrency
+
+### Added
+- **Activation steering / persona vectors** (`agethos.steering`) — extract an OCEAN persona
+  vector from contrastive prompt pairs (mean activation difference, Anthropic persona
+  vectors) and steer it at inference; multi-trait vectors orthogonalized to avoid
+  interference (PERSONA). Pure-Python vector math + prompt generation
+  (`trait_contrastive_prompts`, `mean_diff`, `orthogonalize`, `combine`, `steer`,
+  `extract_persona_vectors`); `MockSteeringBackend` for offline use, optional
+  `TransformersSteeringBackend` (`pip install agethos[steering]`) for real open-weight models.
+- **Benchmark adapters** — `agethos.eval` is now a package:
+  - `eval.ingest_conversation` + `eval.evaluate_recall` — LoCoMo-style long-term memory
+    harness (ingest a conversation, score whether retrieval surfaces each question's evidence).
+  - `eval.persona_to_sotopia_profile` + `eval.score_episode` — Sotopia adapter (map a persona
+    to a Sotopia profile; score an episode on the 7-dimension `SocialEvaluation` rubric).
+  - Existing metrics (`persona_consistency`, `transplant_fidelity`, `retrieval_metrics`, …)
+    unchanged and re-exported.
+- **Async concurrency** (`agethos.concurrency`) — `gather_bounded` / `amap` (bounded-concurrency
+  helpers). Reflection now generates per-focal-point insights concurrently, and A-MEM
+  `link_and_evolve` updates neighbors concurrently — wall-clock = slowest call, not the sum.
+
+10 new tests (`test_v0120.py`); full suite 243 passed, 1 skipped.
+
 ## 0.11.0 — arbitrated memory, associative evolution, perspective-taking, relationships, self-improving playbook
 
 Five research-grounded capabilities (all additive / backward-compatible, offline-testable).

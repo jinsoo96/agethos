@@ -8,6 +8,7 @@ context is rewritten; without one, keywords are merged (deterministic).
 """
 from __future__ import annotations
 
+from agethos.concurrency import amap
 from agethos.memory.retrieval import compute_retrieval_scores
 from agethos.models import MemoryNode
 
@@ -46,7 +47,7 @@ async def link_and_evolve(
     node.links = list(dict.fromkeys([*node.links, *(n.id for n in neighbors)]))
     await stream.store.update(node)
 
-    for nb in neighbors:
+    async def _evolve_neighbor(nb: MemoryNode) -> None:
         if node.id not in nb.links:
             nb.links.append(node.id)
         new_keywords = None
@@ -68,4 +69,6 @@ async def link_and_evolve(
         nb.keywords = new_keywords
         await stream.store.update(nb)
 
+    # neighbors are independent → evolve concurrently (bounded)
+    await amap(_evolve_neighbor, neighbors)
     return neighbors

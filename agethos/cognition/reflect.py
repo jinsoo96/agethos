@@ -12,6 +12,7 @@ from __future__ import annotations
 import time
 
 from agethos.cognition.retrieve import Retriever
+from agethos.concurrency import amap
 from agethos.llm.base import LLMAdapter
 from agethos.memory.stream import MemoryStream
 from agethos.models import MemoryNode, NodeType
@@ -76,51 +77,41 @@ class Reflector:
         # 2. Retrieve related memories per focal point
         focal_memories = await self._retriever.retrieve_for_reflection(focal_points)
 
-        # 3. Generate insights
+        # 3. Generate insights — per-focal-point LLM calls run concurrently (independent).
+        items = [(q, r) for q, r in focal_memories.items() if r]
+        nodes = await amap(lambda pair: self._insight_for(*pair), items)
+
         insights: list[MemoryNode] = []
-        for question, results in focal_memories.items():
-            if not results:
-                continue
-
-            memory_text = "\n".join(
-                f"{i}. [{r.node.node_type.value}] {r.node.description}"
-                for i, r in enumerate(results)
-            )
-
-            try:
-                data = await self._llm.generate_json(
-                    system_prompt="You are a helper that analyzes experiences and derives insights.",
-                    user_prompt=_INSIGHT_PROMPT.format(
-                        question=question,
-                        memories=memory_text,
-                    ),
-                )
-
-                evidence_indices = data.get("evidence_indices", [])
-                evidence_ids = [
-                    results[i].node.id
-                    for i in evidence_indices
-                    if 0 <= i < len(results)
-                ]
-
-                # Max depth of evidence + 1
-                max_depth = max((results[i].node.depth for i in evidence_indices if 0 <= i < len(results)), default=1)
-
-                insight_node = MemoryNode(
-                    node_type=NodeType.THOUGHT,
-                    description=data.get("insight", ""),
-                    importance=8.0,  # Reflections are high importance
-                    depth=max_depth + 1,
-                    evidence_ids=evidence_ids,
-                )
-
-                await self._memory.append(insight_node)
-                insights.append(insight_node)
-            except Exception:
-                continue
+        for node in nodes:
+            if node is not None:
+                await self._memory.append(node)
+                insights.append(node)
 
         self._last_reflection_at = time.time()
         return insights
+
+    async def _insight_for(self, question, results) -> MemoryNode | None:
+        memory_text = "\n".join(
+            f"{i}. [{r.node.node_type.value}] {r.node.description}"
+            for i, r in enumerate(results)
+        )
+        try:
+            data = await self._llm.generate_json(
+                system_prompt="You are a helper that analyzes experiences and derives insights.",
+                user_prompt=_INSIGHT_PROMPT.format(question=question, memories=memory_text),
+            )
+            evidence_indices = data.get("evidence_indices", [])
+            evidence_ids = [results[i].node.id for i in evidence_indices if 0 <= i < len(results)]
+            max_depth = max((results[i].node.depth for i in evidence_indices if 0 <= i < len(results)), default=1)
+            return MemoryNode(
+                node_type=NodeType.THOUGHT,
+                description=data.get("insight", ""),
+                importance=8.0,
+                depth=max_depth + 1,
+                evidence_ids=evidence_ids,
+            )
+        except Exception:
+            return None
 
     async def _generate_focal_points(
         self,
