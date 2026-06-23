@@ -22,6 +22,10 @@ from agethos.export.transplant import (
     LangGraphTransplant,
     TransplantAdapter,
 )
+from agethos.cognition.relationship import RelationshipBook
+from agethos.learning.playbook import Playbook
+from agethos.memory.arbiter import MemoryArbiter, remember
+from agethos.memory.evolve import link_and_evolve
 from agethos.persona import CognitivePolicy
 from agethos.models import (
     Action,
@@ -34,6 +38,7 @@ from agethos.models import (
     DecisionStyle,
     EmotionalState,
     EnvironmentEvent,
+    Lesson,
     MentalModel,
     MemoryNode,
     MoralFoundation,
@@ -42,6 +47,7 @@ from agethos.models import (
     PersonaLayer,
     PersonaSpec,
     PlanItem,
+    Relationship,
     RelationshipType,
     RetrievalResult,
     SchwartzValue,
@@ -71,6 +77,8 @@ __all__ = [
     "Environment",
     "EnvironmentEvent",
     "LangGraphTransplant",
+    "Lesson",
+    "MemoryArbiter",
     "MentalModel",
     "MemoryNode",
     "MoralFoundation",
@@ -79,9 +87,14 @@ __all__ = [
     "PersonaLayer",
     "PersonaSpec",
     "PlanItem",
+    "Playbook",
     "QueueEnvironment",
+    "Relationship",
+    "RelationshipBook",
     "RelationshipType",
     "RetrievalResult",
+    "link_and_evolve",
+    "remember",
     "SchwartzValue",
     "SelfRefineConfig",
     "SelfRefineResult",

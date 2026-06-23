@@ -104,6 +104,9 @@ class MemoryNode(BaseModel):
     # Evidence pointers (for reflections)
     evidence_ids: list[str] = Field(default_factory=list)
 
+    # Associative links to other memory ids (A-MEM Zettelkasten-style graph)
+    links: list[str] = Field(default_factory=list)
+
 
 class RetrievalResult(BaseModel):
     """검색 결과 + 점수 분해."""
@@ -820,6 +823,40 @@ class SocialPattern(BaseModel):
     created_at: float = Field(default_factory=time.time)
 
 
+class Relationship(BaseModel):
+    """상대별 관계 상태 — 강도(0~100)가 상호작용 가치(valence)로 진화 (AgentSociety).
+
+    긍정 상호작용은 강도를 올리고 부정은 내린다. 오래 안 보면 중립(50)으로 천천히 회귀.
+    강도에 따라 소통 빈도/톤/ToM 깊이를 게이팅하는 데 쓴다.
+    """
+
+    target: str
+    type: RelationshipType = RelationshipType.STRANGER
+    strength: float = Field(50.0, ge=0.0, le=100.0)
+    interactions: int = 0
+    last_updated: float = Field(default_factory=time.time)
+
+
+class Lesson(BaseModel):
+    """ACE 식 자기개선 playbook 항목 — helpful/harmful 카운터를 가진 델타 lesson.
+
+    단조 재작성(context collapse) 대신 증분 델타 + 결정론적 dedup(중복은 카운터 증가)으로
+    교훈을 누적한다. net = helpful - harmful 이 retrieval/pruning 가중치.
+    """
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    text: str
+    tags: list[str] = Field(default_factory=list)
+    helpful: int = 0
+    harmful: int = 0
+    provenance: str = ""
+    created_at: float = Field(default_factory=time.time)
+
+    @property
+    def net(self) -> int:
+        return self.helpful - self.harmful
+
+
 class CommunityProfile(BaseModel):
     """커뮤니티별 사회적 규범 프로필.
 
@@ -865,6 +902,10 @@ class BrainState(BaseModel):
 
     # 상대 멘탈 모델 (ToM)
     mental_models: list[MentalModel] = Field(default_factory=list)
+
+    # 관계 강도 (AgentSociety) + 자기개선 playbook (ACE)
+    relationships: list[Relationship] = Field(default_factory=list)
+    lessons: list[Lesson] = Field(default_factory=list)
 
 
 # ────────────────────────── Theory of Mind ──────────────────────────

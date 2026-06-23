@@ -12,6 +12,31 @@
 
 ---
 
+## What's new in 0.11.0 — arbitrated memory, evolution, perspective-taking, relationships, playbook
+
+Five research-backed capabilities (Mem0, A-MEM, SimToM, AgentSociety, ACE) — all additive,
+offline-testable:
+
+- **Arbitrated memory write** (`MemoryArbiter`, `remember()`) — new memories go through an
+  ADD / UPDATE / DELETE / NOOP decision vs the top-K similar (LLM or deterministic), so the
+  store dedups/merges/contradicts instead of growing unbounded.
+- **Associative memory evolution** (`link_and_evolve`) — links a memory to its neighbors
+  (`MemoryNode.links`, a Zettelkasten graph) and evolves their keywords.
+- **SimToM perspective-taking** (`TheoryOfMind.perspective_filter` / `answer_as`) — filter to
+  what someone *knows*, then answer from that view (false-belief reasoning).
+- **Relationship dynamics** (`RelationshipBook`) — typed bonds, strength 0–100 evolving on
+  interaction valence with idle decay; gate tone/frequency by `tier()`.
+- **Self-improving playbook** (`Playbook`, `Lesson`) — ACE delta lessons with helpful/harmful
+  counters + deterministic dedup + grow-and-refine (no context collapse).
+
+```python
+from agethos.memory import MemoryArbiter, remember, link_and_evolve
+from agethos.cognition import RelationshipBook
+from agethos.learning import Playbook
+```
+
+---
+
 ## What's new in 0.10.0 — causal cognition, closed loops, measurable
 
 Traits and emotion now *drive behavior*, the memory loop is closed, and you can

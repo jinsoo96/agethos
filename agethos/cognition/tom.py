@@ -165,6 +165,34 @@ class TheoryOfMind:
         except Exception:
             return ""
 
+    async def perspective_filter(self, context: str, agent: str) -> str:
+        """SimToM 1단계 — context 에서 `agent` 가 *아는* 사건만 남긴다(시점 필터).
+
+        거짓믿음 추론의 핵심: 전체 대화가 아니라 상대가 접근가능한 정보만으로 추론해야
+        한다. (Wilf et al. 2023 — 약모델 false-belief 정확도 대폭 상승.)"""
+        try:
+            return (await self._llm.generate(
+                system_prompt="You take the perspective of a specific person, listing only what they know.",
+                user_prompt=(f"The following is a sequence of events:\n{context}\n\n"
+                             f"Which of these events does {agent} know about? "
+                             f"List only those events, faithfully, from {agent}'s point of view."),
+            )).strip()
+        except Exception:
+            return context
+
+    async def answer_as(self, agent: str, question: str, context: str) -> str:
+        """SimToM 2단계 — `agent` 시점으로 필터된 context 만으로 질문에 답한다.
+
+        perspective_filter → answer_as 2단계로 돌리면 상대의 (틀린) 믿음을 제대로 모형화한다."""
+        known = await self.perspective_filter(context, agent)
+        try:
+            return (await self._llm.generate(
+                system_prompt=f"You answer strictly from {agent}'s perspective and knowledge.",
+                user_prompt=f"{known}\n\nFrom {agent}'s perspective, answer: {question}",
+            )).strip()
+        except Exception:
+            return ""
+
     def get_inference_depth(self, relationship: RelationshipType) -> int:
         """관계 유형별 추론 깊이 반환."""
         return _RELATIONSHIP_DEPTH.get(relationship, 1)

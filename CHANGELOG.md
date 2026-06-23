@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.11.0 — arbitrated memory, associative evolution, perspective-taking, relationships, self-improving playbook
+
+Five research-grounded capabilities (all additive / backward-compatible, offline-testable).
+
+### Added
+- **Mem0-style arbitrated write** (`agethos.memory.MemoryArbiter`, `remember()`) — a new
+  memory is checked against the top-K most similar; an arbiter decides ADD / UPDATE / DELETE
+  / NOOP (LLM-driven; deterministic similarity fallback). Stops uncontrolled growth,
+  duplicates and contradictions. (Mem0, Chhikara et al. 2025)
+- **A-MEM memory evolution** (`agethos.memory.link_and_evolve`) — links a new memory to its
+  nearest neighbors (bidirectional Zettelkasten graph; `MemoryNode.links`) and evolves the
+  neighbors' keywords (LLM or deterministic merge). (A-MEM, Xu et al. 2025)
+- **SimToM perspective-taking** (`TheoryOfMind.perspective_filter` / `answer_as`) — two-stage
+  ToM: filter context to what an agent knows, then answer from that filtered view (large
+  false-belief gains). (Wilf et al. 2023)
+- **Relationship dynamics** (`agethos.cognition.RelationshipBook`, `Relationship`) — typed
+  bonds with strength 0–100 that rise/fall on interaction valence (SOTOPIA −5..+5) and decay
+  toward neutral when idle; `tier()` gating. (AgentSociety, 2025)
+- **ACE self-improving playbook** (`agethos.learning.Playbook`, `Lesson`) — incremental delta
+  lessons with helpful/harmful counters and deterministic dedup (a duplicate increments a
+  counter, never re-summarized) + grow-and-refine pruning; avoids context collapse. (ACE,
+  Zhang et al. 2025)
+- `BrainState.relationships` + `BrainState.lessons` persist with the portable brain.
+
+8 new tests (`test_v0110.py`); full suite 233 passed, 1 skipped.
+
 ## 0.10.0 — causal cognition, closed loops, measurable
 
 Make traits/emotion causally drive behavior, close the memory loop, and ship an
