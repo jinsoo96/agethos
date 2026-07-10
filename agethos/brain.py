@@ -55,10 +55,20 @@ def _resolve_llm(
         if base_url is not None:
             kwargs["api_base"] = base_url
         return LiteLLMAdapter(model=model or "gpt-4o-mini", **kwargs)
+    elif provider in ("claude-code", "claude-cli", "subscription"):
+        from agethos.llm.cli import ClaudeCodeAdapter
+        return ClaudeCodeAdapter(model=model)
+    elif provider == "gemini-cli":
+        from agethos.llm.cli import GeminiCLIAdapter
+        return GeminiCLIAdapter(model=model)
+    elif provider == "codex-cli":
+        from agethos.llm.cli import CodexCLIAdapter
+        return CodexCLIAdapter(model=model)
     else:
         raise ValueError(
             f"Unknown LLM provider: {provider}. "
-            "Use 'openai', 'anthropic', 'litellm', or pass an LLMAdapter instance."
+            "Use 'openai', 'anthropic', 'litellm', 'claude-code', 'gemini-cli', "
+            "'codex-cli', or pass an LLMAdapter instance."
         )
 
 

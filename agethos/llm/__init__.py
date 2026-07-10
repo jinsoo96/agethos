@@ -8,6 +8,9 @@ def _lazy_import(name: str):
     if name == "OpenAIAdapter":
         from agethos.llm.openai import OpenAIAdapter
         return OpenAIAdapter
+    if name in ("CLIAdapter", "ClaudeCodeAdapter", "GeminiCLIAdapter", "CodexCLIAdapter"):
+        from agethos.llm import cli
+        return getattr(cli, name)
     if name == "AnthropicAdapter":
         from agethos.llm.anthropic import AnthropicAdapter
         return AnthropicAdapter

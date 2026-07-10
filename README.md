@@ -12,6 +12,38 @@
 
 ---
 
+## What's new in 0.15.0 — subscription CLI adapters (no API key)
+
+Run every agethos feature — forge, verification, steered chat — on a **flat-rate AI
+subscription** instead of a metered API key. `agethos.llm.cli` shells out to a locally
+authenticated AI CLI per call: Claude Code (`claude -p`, Claude Pro/Max via OAuth),
+Gemini CLI, or OpenAI Codex CLI — or any custom CLI via placeholder argv.
+
+```python
+from agethos import Brain
+
+# No API key anywhere — the `claude` binary is authenticated by your subscription
+brain = await Brain.from_description(
+    "츤데레 같은 선배 바리스타 누나. 겉으론 무심한데 단골 취향은 다 외우고 있음",
+    llm="subscription",      # aliases: "claude-code", "claude-cli"
+    model="sonnet",
+)
+reply = await brain.chat("누나, 오늘도 아이스 아메리카노요!")
+# → "또 아이스 아메리카노네. 여름이든 겨울이든 한결같아, 아주. ...알았어, 나오면 부를게."
+```
+
+- `ClaudeCodeAdapter` / `GeminiCLIAdapter` / `CodexCLIAdapter` presets + generic
+  `CLIAdapter(["mycli", "--sys", "{system_file}", "{prompt}"])` with `{system}`,
+  `{system_file}` (temp-file, survives Windows `.cmd` shims), `{prompt}` placeholders;
+  prompt goes via stdin when `{prompt}` is absent, system prompt is folded into the
+  prompt when the CLI has no system flag.
+- Multi-turn history is folded into the prompt (headless CLIs are single-shot);
+  `generate_json` now also extracts the outermost JSON object from prose-wrapped output.
+- Latency is higher than a raw API (process startup per call); quality is the same model,
+  cost is your subscription.
+
+---
+
 ## What's new in 0.14.0 — judge panel, behavioral verification, GPU-free steering
 
 Three research-grounded upgrades that close the loop from *forging* a persona to

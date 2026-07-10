@@ -59,4 +59,11 @@ class LLMAdapter(ABC):
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             text = "\n".join(lines)
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # some backends preface the JSON with prose — extract the outermost object
+            start, end = text.find("{"), text.rfind("}")
+            if start != -1 and end > start:
+                return json.loads(text[start:end + 1])
+            raise

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.15.0 — subscription CLI adapters (no API key)
+
+### Added
+- **CLI adapters** (`agethos.llm.cli`) — run inference through a locally-authenticated
+  AI CLI instead of a metered API key: `ClaudeCodeAdapter` (`claude -p`, Claude Pro/Max
+  subscription via OAuth; `--system-prompt-file` + `--strict-mcp-config` for fast, safe
+  headless calls), `GeminiCLIAdapter`, `CodexCLIAdapter`, and a generic
+  `CLIAdapter(argv)` with `{system}` / `{system_file}` / `{prompt}` placeholders
+  (stdin prompt by default; system folded into the prompt for CLIs without a system
+  flag; temp-file system prompt survives Windows `.cmd` shim quoting).
+- **Provider strings** — `Brain.build(..., llm="subscription")` (aliases `claude-code`,
+  `claude-cli`), `"gemini-cli"`, `"codex-cli"`.
+- Multi-turn history folding for single-shot CLIs; CRLF-normalized output.
+
+### Fixed
+- `LLMAdapter.generate_json` now extracts the outermost JSON object when a backend
+  wraps the JSON in prose, instead of failing to parse.
+
+10 new tests (`test_v0150.py`); full suite 278 passed, 1 skipped.
+
 ## 0.14.0 — judge panel, behavioral verification, GPU-free steering
 
 ### Added
