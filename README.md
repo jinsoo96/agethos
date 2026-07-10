@@ -12,6 +12,38 @@
 
 ---
 
+## What's new in 0.16.0 — pick your backend: mode × provider × model
+
+One config decides how a brain talks to its model — billing mode (**api** /
+**subscription** / **auto**), provider (claude, openai/chatgpt, gemini, vllm/ollama,
+litellm catch-all), and model:
+
+```python
+from agethos import Brain, LLMConfig, available_backends
+
+# Subscription (flat-rate CLI), API (metered key), or auto-discovery
+brain = Brain.build(persona, llm={"mode": "subscription", "provider": "claude", "model": "sonnet"})
+brain = Brain.build(persona, llm={"mode": "api", "provider": "openai", "model": "gpt-4o"})
+brain = Brain.build(persona, llm={"mode": "api", "provider": "vllm",
+                                  "base_url": "http://localhost:8000/v1", "model": "qwen3"})
+brain = Brain.build(persona, llm="auto")     # key in env? use API. CLI installed? use it.
+
+available_backends()   # what this machine can use right now:
+# {'api': {'claude': False, 'openai': False, 'gemini': False},
+#  'subscription': {'claude': True, 'gemini': False, 'openai': False}}
+```
+
+- `LLMConfig` + `resolve_llm()` (`agethos.llm.select`) — every `llm=` argument
+  (`Brain.build` / `Brain.from_description` / `Brain.load`) now also accepts a config
+  dict, an `LLMConfig`, or `"auto"`; plain provider strings keep their old meaning.
+- **auto mode** prefers an API key when present (lower latency), falls back to an
+  installed subscription CLI, and raises with the discovery report when neither exists.
+- Env defaults for zero-code config: `AGETHOS_LLM_MODE` / `AGETHOS_LLM_PROVIDER` /
+  `AGETHOS_LLM_MODEL` / `AGETHOS_LLM_API_KEY` / `AGETHOS_LLM_BASE_URL`.
+- Custom CLIs: `{"mode": "subscription", "command": ["mycli", "--sys", "{system_file}", "{prompt}"]}`.
+
+---
+
 ## What's new in 0.15.0 — subscription CLI adapters (no API key)
 
 Run every agethos feature — forge, verification, steered chat — on a **flat-rate AI

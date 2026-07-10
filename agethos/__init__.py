@@ -34,6 +34,7 @@ from agethos.forge import (
     verify_persona,
     verify_social,
 )
+from agethos.llm.select import LLMConfig, available_backends, resolve_llm
 from agethos.steering.rerank import RerankResult, attribute_score, steered_generate
 from agethos.learning.playbook import Playbook
 from agethos.memory.arbiter import MemoryArbiter, remember
@@ -94,6 +95,7 @@ __all__ = [
     "ForgeResult",
     "LangGraphTransplant",
     "Lesson",
+    "LLMConfig",
     "MemoryArbiter",
     "MentalModel",
     "MemoryNode",
@@ -121,12 +123,14 @@ __all__ = [
     "TransplantAdapter",
     # Functions
     "attribute_score",
+    "available_backends",
     "extract_fingerprint",
     "forge",
     "inspect_brain",
     "pack_brain",
     "plan_vectors",
     "resolve_embedder",
+    "resolve_llm",
     "steered_generate",
     "transplant",
     "unpack_brain",

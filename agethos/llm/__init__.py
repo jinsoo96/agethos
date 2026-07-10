@@ -11,6 +11,9 @@ def _lazy_import(name: str):
     if name in ("CLIAdapter", "ClaudeCodeAdapter", "GeminiCLIAdapter", "CodexCLIAdapter"):
         from agethos.llm import cli
         return getattr(cli, name)
+    if name in ("LLMConfig", "resolve_llm", "available_backends"):
+        from agethos.llm import select
+        return getattr(select, name)
     if name == "AnthropicAdapter":
         from agethos.llm.anthropic import AnthropicAdapter
         return AnthropicAdapter

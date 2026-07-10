@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.16.0 — LLM selection layer: mode × provider × model
+
+### Added
+- **`agethos.llm.select`** — `LLMConfig` (mode: `api` / `subscription` / `auto`,
+  provider, model, api_key, base_url, timeout, custom CLI `command`) + `resolve_llm()`
+  mapping the full matrix: claude/anthropic, openai/chatgpt/codex, gemini/google,
+  vllm/ollama/openai-compatible (base_url), litellm catch-all for everything else;
+  subscription side maps to the CLI adapters.
+- **auto mode** — prefer an available API key, fall back to an installed subscription
+  CLI, raise with a machine-discovery report when neither exists.
+  `available_backends()` reports which API keys are set and which CLIs are on PATH.
+- **Env defaults** — `AGETHOS_LLM_MODE` / `AGETHOS_LLM_PROVIDER` / `AGETHOS_LLM_MODEL` /
+  `AGETHOS_LLM_API_KEY` / `AGETHOS_LLM_BASE_URL` via `LLMConfig.from_env()`.
+- **Brain wiring** — `llm=` on `Brain.build` / `Brain.from_description` / `Brain.load`
+  now also accepts a config dict, an `LLMConfig`, or `"auto"`; existing provider strings
+  and adapter instances behave exactly as before.
+
+12 new tests (`test_v0160.py`); full suite 290 passed, 1 skipped.
+
 ## 0.15.0 — subscription CLI adapters (no API key)
 
 ### Added

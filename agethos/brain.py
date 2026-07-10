@@ -68,8 +68,28 @@ def _resolve_llm(
         raise ValueError(
             f"Unknown LLM provider: {provider}. "
             "Use 'openai', 'anthropic', 'litellm', 'claude-code', 'gemini-cli', "
-            "'codex-cli', or pass an LLMAdapter instance."
+            "'codex-cli', 'auto', a config dict/LLMConfig, or pass an LLMAdapter instance."
         )
+
+
+def _coerce_llm(llm, model=None, api_key=None, base_url=None):
+    """Anything the ``llm=`` argument accepts → LLMAdapter.
+
+    Strings keep their v0.15 meaning; 'auto' and dict/LLMConfig route through the
+    selection layer (mode: api/subscription/auto — see agethos.llm.select)."""
+    if isinstance(llm, str):
+        if llm == "auto":
+            from agethos.llm.select import resolve_llm
+            return resolve_llm(None, model=model, api_key=api_key, base_url=base_url)
+        return _resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
+    if isinstance(llm, dict):
+        from agethos.llm.select import resolve_llm
+        return resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
+    from agethos.llm.select import LLMConfig
+    if isinstance(llm, LLMConfig):
+        from agethos.llm.select import resolve_llm
+        return resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
+    return llm
 
 
 class Brain:
@@ -195,9 +215,8 @@ class Brain:
         elif isinstance(persona, str):
             persona = PersonaSpec.from_yaml(persona)
 
-        # Resolve LLM
-        if isinstance(llm, str):
-            llm = _resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
+        # Resolve LLM (string / dict / LLMConfig / adapter instance)
+        llm = _coerce_llm(llm, model=model, api_key=api_key, base_url=base_url)
 
         # Resolve embedder
         if isinstance(embedder, str):
@@ -245,8 +264,7 @@ class Brain:
             print(brain.forge_result.report.overall)   # fidelity score
             reply = await brain.chat("이 설계 어때요?")
         """
-        if isinstance(llm, str):
-            llm = _resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
+        llm = _coerce_llm(llm, model=model, api_key=api_key, base_url=base_url)
 
         from agethos.forge import forge as _forge
         result = await _forge(
@@ -517,9 +535,8 @@ class Brain:
 
         state = BrainState.model_validate(data)
 
-        # Resolve LLM
-        if isinstance(llm, str):
-            llm = _resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
+        # Resolve LLM (string / dict / LLMConfig / adapter instance)
+        llm = _coerce_llm(llm, model=model, api_key=api_key, base_url=base_url)
 
         brain = cls(persona=state.persona, llm=llm, **kwargs)
 
