@@ -23,6 +23,14 @@ from agethos.export.transplant import (
     TransplantAdapter,
 )
 from agethos.cognition.relationship import RelationshipBook
+from agethos.forge import (
+    FacetScore,
+    ForgeReport,
+    ForgeResult,
+    SteeringIntent,
+    forge,
+    plan_vectors,
+)
 from agethos.learning.playbook import Playbook
 from agethos.memory.arbiter import MemoryArbiter, remember
 from agethos.memory.evolve import link_and_evolve
@@ -76,6 +84,9 @@ __all__ = [
     "EmotionalState",
     "Environment",
     "EnvironmentEvent",
+    "FacetScore",
+    "ForgeReport",
+    "ForgeResult",
     "LangGraphTransplant",
     "Lesson",
     "MemoryArbiter",
@@ -100,11 +111,14 @@ __all__ = [
     "SelfRefineResult",
     "SocialEvaluation",
     "SocialPattern",
+    "SteeringIntent",
     "TransplantAdapter",
     # Functions
     "extract_fingerprint",
+    "forge",
     "inspect_brain",
     "pack_brain",
+    "plan_vectors",
     "resolve_embedder",
     "transplant",
     "unpack_brain",

@@ -131,6 +131,9 @@ class Brain:
         # Seed memories
         self._seed_loaded = False
 
+        # Set by Brain.from_description (forge trace/report)
+        self.forge_result = None
+
     # ── Factory methods ──
 
     @classmethod
@@ -200,6 +203,54 @@ class Brain:
             kwargs["embedder"] = embedder
 
         return cls(persona=persona, llm=llm, **kwargs)
+
+    @classmethod
+    async def from_description(
+        cls,
+        description: str,
+        llm: str | LLMAdapter,
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        forge_llm: LLMAdapter | None = None,
+        judge_llm: LLMAdapter | None = None,
+        name: str | None = None,
+        pin: dict | None = None,
+        max_rounds: int = 3,
+        target: float = 0.85,
+        **kwargs,
+    ) -> Brain:
+        """Forge a persona from a free-text description and mount it on any LLM.
+
+        The description — rough or detailed, any language — is compiled into typed
+        config values (``agethos.forge``), judged for fidelity, repaired until it
+        converges, then mounted. The forge trace lands on ``brain.forge_result``.
+
+        Examples::
+
+            brain = await Brain.from_description(
+                "까칠하지만 속정 깊은 30대 시니어 백엔드 개발자",
+                llm="openai", model="qwen3", base_url="http://localhost:8000/v1",
+            )
+            print(brain.forge_result.report.overall)   # fidelity score
+            reply = await brain.chat("이 설계 어때요?")
+        """
+        if isinstance(llm, str):
+            llm = _resolve_llm(llm, model=model, api_key=api_key, base_url=base_url)
+
+        from agethos.forge import forge as _forge
+        result = await _forge(
+            description,
+            llm=forge_llm or llm,
+            judge_llm=judge_llm,
+            name=name,
+            pin=pin,
+            max_rounds=max_rounds,
+            target=target,
+        )
+        brain = cls(persona=result.spec, llm=llm, **kwargs)
+        brain.forge_result = result
+        return brain
 
     async def _ensure_seed(self) -> None:
         """시드 메모리 로드 (최초 1회)."""

@@ -12,6 +12,50 @@
 
 ---
 
+## What's new in 0.13.0 — the persona forge: description → typed config → any LLM
+
+Say what the personality is — one rough line or a detailed paragraph, any language — and
+the forge compiles it into the full typed config (`PersonaSpec`: OCEAN, cognitive policy
+inputs, tone, values, hard/soft constraints, decision style, seed memory), judges the
+config's fidelity to your description facet-by-facet, and re-forges only the weak facets
+until it converges. Personality as **config values**, not a hand-written system prompt —
+then one config mounts anywhere: prompt layer (renderer), activation layer (steering
+plan), framework layer (transplant adapters).
+
+```python
+from agethos import Brain, forge
+
+# One call: rough description → forged persona → mounted on any LLM
+brain = await Brain.from_description(
+    "까칠한데 은근 정 많은 시니어 백엔드 개발자 아저씨",
+    llm="openai", model="qwen3", base_url="http://localhost:8000/v1",
+)
+print(brain.forge_result.report.overall)        # judged fidelity, e.g. 0.91
+reply = await brain.chat("제 코드 리뷰 좀 해주실 수 있나요?")
+
+# Or forge the config alone and mount it yourself
+result = await forge("An anxious, endlessly curious barista", llm=my_adapter)
+result.spec                                     # full typed PersonaSpec
+result.render()                                 # prompt-layer mount
+result.steering_plan()                          # activation-layer mount (open weights)
+```
+
+- **Compiler** (`agethos.forge.draft_spec`) — LLM-driven description → config extraction
+  with lenient coercion (clamped OCEAN, invalid enums dropped); zero-LLM lexicon fallback
+  (EN + KO) so everything runs offline.
+- **Judge loop** (`agethos.forge.forge`) — per-facet fidelity report (`ForgeReport`),
+  targeted repair of weak facets only, convergence trace (`ForgeResult.trace`).
+- **Config layering** — `base` (existing spec) < forged draft < `pin` (fields the forge
+  may never overwrite), harness-config style.
+- **Steering handoff** — `result.steering_plan()` lists traits deviating from the prior
+  (direction + strength); `plan_vectors()` turns the plan into scaled persona vectors.
+
+Measured (Claude Sonnet 4.5): rough one-liner → fidelity 0.91, detailed paragraph → 0.98,
+both converged in one round; the two mounted personas answer the same message in
+completely different, description-faithful ways.
+
+---
+
 ## What's new in 0.12.0 — persona-vector steering, real benchmarks, async
 
 - **Activation steering / persona vectors** (`agethos.steering`) — extract an OCEAN persona
@@ -231,7 +275,23 @@ Two agents with identical questions, different OCEAN profiles — tested with `g
 
 ## Quick Start
 
-### 1. One-liner with `Brain.build()`
+### 1. Forge a persona from a description
+
+```python
+from agethos import Brain
+
+# Any language, rough or detailed — the forge compiles it into typed config values,
+# judges fidelity, repairs weak facets, then mounts the result on the LLM.
+brain = await Brain.from_description(
+    "A meticulous, soft-spoken data scientist who never states guesses as facts",
+    llm="openai",
+    pin={"name": "Jieun"},        # fields the forge may never overwrite
+)
+print(brain.forge_result.report.overall)   # judged fidelity
+print(brain.forge_result.spec.ocean)       # extracted OCEAN config
+```
+
+### 2. One-liner with `Brain.build()`
 
 ```python
 from agethos import Brain
@@ -249,7 +309,7 @@ brain = Brain.build(
 reply = await brain.chat("How's the recommendation system going?")
 ```
 
-### 2. From YAML file
+### 3. From YAML file
 
 ```yaml
 # personas/minsoo.yaml
@@ -268,7 +328,7 @@ rules:
 brain = Brain.build(persona="personas/minsoo.yaml", llm="openai")
 ```
 
-### 3. Full control (traditional style)
+### 4. Full control (traditional style)
 
 ```python
 from agethos import Brain, PersonaSpec, PersonaLayer, OceanTraits
@@ -301,7 +361,7 @@ reply = await brain.chat("How's the recommendation system going?")
 reply2 = await brain.chat("Can you elaborate on the caching part?")
 ```
 
-### 4. LiteLLM — 100+ Providers (Gemini, Groq, Mistral, ...)
+### 5. LiteLLM — 100+ Providers (Gemini, Groq, Mistral, ...)
 
 ```python
 # Google Gemini
@@ -325,7 +385,7 @@ adapter = LiteLLMAdapter(model="gemini/gemini-2.0-flash", api_key="...", max_tok
 brain = Brain(persona=spec, llm=adapter)
 ```
 
-### 5. LangChain / LangGraph Integration
+### 6. LangChain / LangGraph Integration
 
 ```python
 from agethos import Brain
@@ -346,7 +406,7 @@ brain = Brain(persona=spec, llm=LangChainAdapter(ChatAnthropic(model="claude-son
 # Works seamlessly in LangGraph nodes — same Brain, same adapter
 ```
 
-### 6. Emotional Events
+### 7. Emotional Events
 
 ```python
 # Apply an event that triggers emotion
@@ -357,7 +417,7 @@ print(brain.emotion.closest_emotion())  # "sadness"
 brain.decay_emotion(rate=0.1)
 ```
 
-### 7. Random Persona Generation
+### 8. Random Persona Generation
 
 ```python
 from agethos import PersonaSpec, OceanTraits
@@ -376,7 +436,7 @@ ocean = OceanTraits.random(E=0.2)  # pin extraversion, randomize rest
 brain = Brain.build(persona=PersonaSpec.random(), llm="openai")
 ```
 
-### 8. Character Card Import (W++ / SBF / Tavern Card)
+### 9. Character Card Import (W++ / SBF / Tavern Card)
 
 ```python
 from agethos import CharacterCard

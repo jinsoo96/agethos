@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.13.0 — the persona forge: description → typed config → any LLM
+
+### Added
+- **Persona forge** (`agethos.forge`) — compile a free-text personality description
+  (rough or detailed, any language) into the full typed `PersonaSpec` config, judge the
+  config's fidelity to the description facet-by-facet, and re-forge only the weak facets
+  until it converges. Personality as config values, not a hand-written system prompt.
+  - `draft_spec` / `repair_spec` — LLM-driven compiler with lenient coercion (OCEAN
+    clamped to [0,1], invalid enum values dropped, layers/emotion label mapped); zero-LLM
+    deterministic fallback via an EN+KO substring lexicon (`estimate_ocean`).
+  - `judge_spec` → `ForgeReport` (per-facet `FacetScore` + `weak()` / `issues()`);
+    deterministic coverage judge for offline runs.
+  - `forge()` → `ForgeResult` — the loop (draft → judge → targeted repair) with a
+    convergence `trace`, plus config layering: `base` (existing spec) < forged draft <
+    `pin` (fields the forge may never overwrite).
+  - Steering handoff — `ForgeResult.steering_plan()` (traits deviating from the 0.5
+    prior → direction + strength) and `plan_vectors()` (plan → scaled persona vectors
+    for open-weight steering).
+- **`Brain.from_description()`** — one call from description to a mounted brain on any
+  provider (`openai` / `anthropic` / `litellm` / adapter instance); the forge trace lands
+  on `brain.forge_result`.
+
+Measured with a real LLM (Claude Sonnet 4.5): a rough one-liner forged to fidelity 0.91
+and a detailed paragraph to 0.98, both converging in one round; the two mounted personas
+answer the same message in completely different, description-faithful ways.
+
+13 new tests (`test_v0130.py`); full suite 256 passed, 1 skipped.
+
 ## 0.12.0 — persona-vector steering, real-benchmark adapters, async concurrency
 
 ### Added
