@@ -106,16 +106,20 @@ async def judge_spec(
     description: str,
     spec: PersonaSpec,
     llm: LLMAdapter | None = None,
+    lens: str = "",
 ) -> ForgeReport:
-    """Judge spec fidelity to the description (LLM-driven; deterministic fallback)."""
+    """Judge spec fidelity to the description (LLM-driven; deterministic fallback).
+
+    ``lens`` focuses this judge on one failure mode (used by the panel)."""
     if llm is None:
         return deterministic_judge(description, spec)
 
+    system = _JUDGE_SYSTEM if not lens else f"{_JUDGE_SYSTEM}\n\nYour judging lens: {lens}"
     user = (
         f"Personality description:\n{description}\n\n"
         f"Persona config:\n{spec.model_dump_json(exclude_none=True)}"
     )
-    data = await llm.generate_json(_JUDGE_SYSTEM, user)
+    data = await llm.generate_json(system, user)
     facets: list[FacetScore] = []
     raw = data.get("facets", {})
     for facet in _FACETS:

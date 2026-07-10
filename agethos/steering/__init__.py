@@ -14,10 +14,19 @@ from agethos.steering.backend import (
     extract_persona_vectors,
 )
 from agethos.steering.contrastive import ocean_contrastive_prompts, trait_contrastive_prompts
+from agethos.steering.plan import SteeringIntent, plan_from_ocean, plan_vectors
+from agethos.steering.rerank import (
+    RankedCandidate,
+    RerankResult,
+    attribute_score,
+    steered_generate,
+)
 from agethos.steering.vectors import PersonaVector, combine, mean_diff, orthogonalize, steer
 
 __all__ = [
     "PersonaVector", "mean_diff", "orthogonalize", "combine", "steer",
     "trait_contrastive_prompts", "ocean_contrastive_prompts",
     "SteeringBackend", "MockSteeringBackend", "extract_persona_vectors",
+    "SteeringIntent", "plan_from_ocean", "plan_vectors",
+    "RankedCandidate", "RerankResult", "attribute_score", "steered_generate",
 ]

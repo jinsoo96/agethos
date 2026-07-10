@@ -2,28 +2,24 @@
 
 CONFIG-FORGE pattern applied to personality: the deliverable is a typed config
 (``PersonaSpec``), the judge measures fidelity to the source description, and each
-round regenerates only the facets that scored weak. The result mounts on any LLM
-(prompt layer via the renderer, activation layer via a steering plan, framework layer
-via transplant adapters).
+round regenerates only the facets that scored weak. Variance is reduced by sampling
+multiple drafts and judging with a lensed panel (``samples`` / ``judges``, see
+``agethos.forge.panel``). The result mounts on any LLM: prompt layer (renderer),
+activation layer (steering plan → vectors) or black-box re-ranking
+(``agethos.steering.rerank``), framework layer (transplant adapters) — and can be
+behaviorally verified afterwards (``agethos.forge.verify``).
 """
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from agethos.concurrency import gather_bounded
 from agethos.forge.compiler import draft_spec, repair_spec
-from agethos.forge.judge import ForgeReport, judge_spec
+from agethos.forge.judge import ForgeReport
+from agethos.forge.panel import DRAFT_VARIANTS, graft, panel_judge
 from agethos.llm.base import LLMAdapter
 from agethos.models import PersonaSpec
-
-_TRAIT_DIMS = ("openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism")
-
-
-class SteeringIntent(BaseModel):
-    """One trait the forged persona wants steered at the activation level."""
-
-    trait: str
-    direction: int = Field(1, description="+1 = toward trait-high pole, -1 = trait-low")
-    strength: float = Field(0.0, ge=0.0, le=1.0, description="|trait − 0.5| × 2")
+from agethos.steering.plan import SteeringIntent, plan_from_ocean, plan_vectors  # noqa: F401 (re-export)
 
 
 class ForgeRound(BaseModel):
@@ -47,34 +43,15 @@ class ForgeResult(BaseModel):
         return PersonaRenderer(self.spec).render_full()
 
     def steering_plan(self, threshold: float = 0.15) -> list[SteeringIntent]:
-        """Traits deviating from the 0.5 prior by ≥ threshold → activation-steering targets."""
+        """Traits deviating from the 0.5 prior by ≥ threshold → steering targets."""
         if self.spec.ocean is None:
             return []
-        plan: list[SteeringIntent] = []
-        for dim in _TRAIT_DIMS:
-            v = getattr(self.spec.ocean, dim)
-            if abs(v - 0.5) >= threshold:
-                plan.append(SteeringIntent(
-                    trait=dim,
-                    direction=1 if v > 0.5 else -1,
-                    strength=round(min(1.0, abs(v - 0.5) * 2), 4),
-                ))
-        return plan
+        return plan_from_ocean(self.spec.ocean, threshold=threshold)
 
-
-def plan_vectors(plan: list[SteeringIntent], backend, layer: int = -1):
-    """Steering plan → direction/strength-scaled PersonaVectors for open-weight models."""
-    from agethos.steering import PersonaVector, extract_persona_vectors
-    vecs = extract_persona_vectors(backend, traits=[p.trait for p in plan], layer=layer)
-    by_trait = {v.trait: v for v in vecs}
-    return [
-        PersonaVector(
-            trait=p.trait,
-            vector=[x * p.direction * p.strength for x in by_trait[p.trait].vector],
-            layer=layer,
-        )
-        for p in plan
-    ]
+    async def verify(self, llm: LLMAdapter, items: list[dict] | None = None):
+        """Behavioral check: mount the spec and psychometrically probe it (Mini-IPIP)."""
+        from agethos.forge.verify import verify_persona
+        return await verify_persona(self.spec, llm, items=items)
 
 
 async def forge(
@@ -87,6 +64,8 @@ async def forge(
     max_rounds: int = 3,
     target: float = 0.85,
     weak_threshold: float = 0.7,
+    samples: int = 1,
+    judges: int = 1,
 ) -> ForgeResult:
     """Forge a persona config from a free-text description.
 
@@ -100,16 +79,32 @@ async def forge(
         max_rounds: Judge/repair rounds before returning the best spec seen.
         target: Overall fidelity that counts as converged.
         weak_threshold: Facet score below this gets repaired next round.
+        samples: Independent drafts to sample; the best facets are grafted together
+            (self-consistency). Needs an LLM; 1 = single draft.
+        judges: Panel size per judge pass (lensed judges, median-aggregated); 1 = single.
     """
     judge_llm = judge_llm or llm
-    spec = await draft_spec(description, llm=llm, name=name, base=base, pin=pin)
+
+    async def _judge(s: PersonaSpec) -> ForgeReport:
+        return await panel_judge(description, s, llm=judge_llm, judges=judges)
+
+    if llm is not None and samples > 1:
+        drafts = await gather_bounded([
+            draft_spec(description, llm=llm, name=name, base=base, pin=pin,
+                       variant=DRAFT_VARIANTS[i % len(DRAFT_VARIANTS)])
+            for i in range(samples)
+        ])
+        reports = await gather_bounded([_judge(d) for d in drafts])
+        spec = graft(list(zip(drafts, reports)))
+    else:
+        spec = await draft_spec(description, llm=llm, name=name, base=base, pin=pin)
 
     trace: list[ForgeRound] = []
     best_spec, best_report = spec, None
     converged = False
 
     for rnd in range(1, max_rounds + 1):
-        report = await judge_spec(description, spec, llm=judge_llm)
+        report = await _judge(spec)
         weak = report.weak(weak_threshold)
         trace.append(ForgeRound(round=rnd, overall=report.overall, weak=weak))
 

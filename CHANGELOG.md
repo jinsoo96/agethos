@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.14.0 — judge panel, behavioral verification, GPU-free steering
+
+### Added
+- **Multi-sample forge + judge panel** (`agethos.forge.panel`) — `forge(..., samples=N,
+  judges=M)`: N independent drafts (varied readings), each scored by a panel of
+  differently-lensed judges (fidelity / coverage / overreach) aggregated by median
+  (`aggregate_reports`), then facet-level `graft()` composes the best-scoring parts into
+  one config. `judge_spec(..., lens=...)` / `draft_spec(..., variant=...)` support the
+  panel. (Self-consistency, Wang et al. 2022; PoLL, Verga et al. 2024.)
+- **Behavioral verification** (`agethos.forge.verify`) — `verify_persona()` administers
+  the Mini-IPIP inventory (Donnellan et al. 2006; public-domain IPIP) to the mounted
+  persona in one batched call, reverse-keys and normalizes, and returns a
+  `BehavioralReport` (measured OCEAN, `ocean_fidelity`, per-trait gaps) — the
+  questionnaire method of MPI (Jiang et al., NeurIPS 2023) / PersonaLLM (2024).
+  `verify_social()` runs a short two-persona scenario episode and scores it on the
+  SOTOPIA rubric via the existing adapter. `ForgeResult.verify()` convenience.
+- **GPU-free steering for black-box LLMs** (`agethos.steering.rerank`) —
+  `attribute_score()` (deterministic trait-pole attribute model from the contrastive
+  vocabulary) + `steered_generate()` (sample n, re-rank by attribute + optional LLM
+  judge, best-of-n). PPLM/FUDGE attribute-guided generation (Dathathri et al. 2020;
+  Yang & Klein 2021) recast as rejection sampling (Stiennon et al. 2020; Nakano et al.
+  2021). Wired into the cognitive loop: `Brain.chat(msg, steer_n=3)`.
+- **Steering plans promoted to `agethos.steering.plan`** — `SteeringIntent`,
+  `plan_from_ocean()`, `plan_vectors()` now live beside the other steering machinery
+  (re-exported from `agethos.forge` unchanged, fully backward compatible).
+
+12 new tests (`test_v0140.py`); full suite 268 passed, 1 skipped.
+
 ## 0.13.0 — the persona forge: description → typed config → any LLM
 
 ### Added

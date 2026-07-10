@@ -12,6 +12,44 @@
 
 ---
 
+## What's new in 0.14.0 — judge panel, behavioral verification, GPU-free steering
+
+Three research-grounded upgrades that close the loop from *forging* a persona to
+*proving* it behaves — all pure prompt/Python, no GPU, any provider:
+
+- **Multi-sample forge + judge panel** (`forge(..., samples=N, judges=M)`) — sample N
+  independent drafts, score each with a panel of differently-lensed judges (fidelity /
+  coverage / overreach) median-aggregated, then **graft** the best-scoring facets of the
+  candidates into one config. (Self-consistency: Wang et al. 2022; panel of LLM judges:
+  Verga et al. 2024.)
+- **Behavioral verification** (`agethos.forge.verify`) — does the *mounted* persona
+  behave like its config? Psychometric probe: administer the Mini-IPIP inventory
+  (Donnellan et al. 2006, public-domain IPIP) to the persona and compare measured vs
+  configured OCEAN (`verify_persona` → `BehavioralReport`, the questionnaire method of
+  MPI, Jiang et al. NeurIPS 2023 / PersonaLLM 2024). Social probe: `verify_social` runs
+  a short two-persona episode and scores it on the SOTOPIA rubric (Zhou et al. ICLR 2024).
+- **GPU-free steering for black-box LLMs** (`agethos.steering.rerank`) — activation
+  steering needs weights; API models expose none. Counterpart: sample n candidates and
+  re-rank with a deterministic trait-pole attribute model (+ optional LLM judge) — the
+  PPLM/FUDGE attribute-guided idea (Dathathri et al. 2020; Yang & Klein 2021) as
+  best-of-n selection (Stiennon et al. 2020; Nakano et al. 2021). Wired into the chat
+  loop: `brain.chat(msg, steer_n=3)`.
+
+```python
+result = await forge(desc, llm=my_llm, samples=2, judges=3)   # panel-forged config
+report = await result.verify(my_llm)                          # Mini-IPIP probe
+print(report.ocean_fidelity, report.trait_gaps)               # measured vs configured
+reply = await brain.chat("ship it without tests?", steer_n=3) # best-of-n steered reply
+```
+
+Measured (Claude Sonnet 4.5, same rough one-liner as 0.13.0): panel forge converged at
+fidelity 0.93 (vs 0.91 single-sample); the mounted persona's Mini-IPIP self-report
+matched its configured OCEAN at 0.78 — with the probe surfacing that the "secretly
+caring" trait leaks into self-reported agreeableness (+0.35), exactly the kind of
+config-vs-behavior gap this layer exists to measure; SOTOPIA believability 9.0/10.
+
+---
+
 ## What's new in 0.13.0 — the persona forge: description → typed config → any LLM
 
 Say what the personality is — one rough line or a detailed paragraph, any language — and

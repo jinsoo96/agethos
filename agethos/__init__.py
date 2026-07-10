@@ -24,13 +24,17 @@ from agethos.export.transplant import (
 )
 from agethos.cognition.relationship import RelationshipBook
 from agethos.forge import (
+    BehavioralReport,
     FacetScore,
     ForgeReport,
     ForgeResult,
     SteeringIntent,
     forge,
     plan_vectors,
+    verify_persona,
+    verify_social,
 )
+from agethos.steering.rerank import RerankResult, attribute_score, steered_generate
 from agethos.learning.playbook import Playbook
 from agethos.memory.arbiter import MemoryArbiter, remember
 from agethos.memory.evolve import link_and_evolve
@@ -80,6 +84,7 @@ __all__ = [
     "CrewAITransplant",
     "DailyPlan",
     "DecisionStyle",
+    "BehavioralReport",
     "EmbeddingAdapter",
     "EmotionalState",
     "Environment",
@@ -109,17 +114,22 @@ __all__ = [
     "SchwartzValue",
     "SelfRefineConfig",
     "SelfRefineResult",
+    "RerankResult",
     "SocialEvaluation",
     "SocialPattern",
     "SteeringIntent",
     "TransplantAdapter",
     # Functions
+    "attribute_score",
     "extract_fingerprint",
     "forge",
     "inspect_brain",
     "pack_brain",
     "plan_vectors",
     "resolve_embedder",
+    "steered_generate",
     "transplant",
     "unpack_brain",
+    "verify_persona",
+    "verify_social",
 ]

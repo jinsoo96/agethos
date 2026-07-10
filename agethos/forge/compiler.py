@@ -151,14 +151,19 @@ async def draft_spec(
     name: str | None = None,
     base: PersonaSpec | None = None,
     pin: dict | None = None,
+    variant: str = "",
 ) -> PersonaSpec:
-    """Compile a description into a full PersonaSpec (LLM-driven; lexicon fallback)."""
+    """Compile a description into a full PersonaSpec (LLM-driven; lexicon fallback).
+
+    ``variant`` nudges this draft toward a different reading (used for multi-sampling)."""
     if llm is None:
         data = deterministic_draft(description, name=name)
     else:
         user = f"Personality description:\n{description}"
         if name:
             user += f"\n\nThe persona's name MUST be: {name}"
+        if variant:
+            user += f"\n\n{variant}"
         data = await llm.generate_json(_DRAFT_SYSTEM, user)
         if name:
             data["name"] = name

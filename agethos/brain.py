@@ -289,6 +289,7 @@ class Brain:
         self,
         user_message: str,
         context: str = "",
+        steer_n: int = 1,
     ) -> str:
         """Conversation with full cognitive loop.
 
@@ -321,11 +322,26 @@ class Brain:
         if context:
             user_prompt = f"[Context: {context}]\n\n{user_message}"
 
-        response = await self._llm.generate_with_history(
-            system_prompt=system_prompt,
-            history=list(self._history),
-            user_prompt=user_prompt,
-        )
+        # steer_n > 1: GPU-free best-of-n steering — sample candidates and re-rank them
+        # by trait-pole attribute alignment with the persona's OCEAN (steering.rerank).
+        if steer_n > 1 and self._persona.ocean is not None:
+            from agethos.steering.plan import plan_from_ocean
+            from agethos.steering.rerank import steered_generate
+            result = await steered_generate(
+                self._llm,
+                system_prompt,
+                user_prompt,
+                plan=plan_from_ocean(self._persona.ocean),
+                n=steer_n,
+                history=list(self._history),
+            )
+            response = result.best
+        else:
+            response = await self._llm.generate_with_history(
+                system_prompt=system_prompt,
+                history=list(self._history),
+                user_prompt=user_prompt,
+            )
 
         # 4.5. Self-Refine (optional)
         if self._self_refine_config.enabled:

@@ -25,6 +25,8 @@ async def main() -> None:
     parser.add_argument("--model", default=None)
     parser.add_argument("--base-url", default=None)
     parser.add_argument("--description", default=DESCRIPTION)
+    parser.add_argument("--samples", type=int, default=1, help="drafts to sample (panel forge)")
+    parser.add_argument("--judges", type=int, default=1, help="judge panel size")
     args = parser.parse_args()
 
     adapter = None
@@ -32,7 +34,8 @@ async def main() -> None:
         from agethos.brain import _resolve_llm
         adapter = _resolve_llm(args.llm, model=args.model, base_url=args.base_url)
 
-    result = await forge(args.description, llm=adapter, name="Minsoo")
+    result = await forge(args.description, llm=adapter, name="Minsoo",
+                         samples=args.samples, judges=args.judges)
 
     print(f"converged={result.converged} rounds={result.rounds}")
     for t in result.trace:
@@ -55,9 +58,14 @@ async def main() -> None:
     print(result.render()[:400])
 
     if adapter:
+        print("\nbehavioral verify (Mini-IPIP psychometric probe):")
+        report = await result.verify(adapter)
+        print(f"  measured OCEAN: {report.measured_ocean}")
+        print(f"  ocean_fidelity: {report.ocean_fidelity:.3f}  gaps: {report.trait_gaps}")
+
         brain = Brain(persona=spec, llm=adapter)
-        reply = await brain.chat("제 코드 리뷰 좀 해주실 수 있나요? 좀 급해서요...")
-        print(f"\n[chat] {reply[:400]}")
+        reply = await brain.chat("제 코드 리뷰 좀 해주실 수 있나요? 좀 급해서요...", steer_n=3)
+        print(f"\n[steered chat, best-of-3] {reply[:400]}")
 
 
 if __name__ == "__main__":
